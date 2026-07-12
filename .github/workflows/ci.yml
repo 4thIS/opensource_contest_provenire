@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - name: 테스트
+        run: pytest -q
+      - name: 린트
+        run: ruff check .
+
+  verify-claim:
+    # 핵심 명제가 깨지지 않았는지 CI에서 매번 확인한다.
+    # "이름을 바꿔도 잡아낸다" — 이게 무너지면 프로젝트의 존재 이유가 사라진다.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: 핵심 명제 검증 (benchmarks)
+        run: python benchmarks/poc_winnowing.py

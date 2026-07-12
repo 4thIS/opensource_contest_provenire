@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "provenire"
+version = "0.0.1"
+description = "AI가 생성한 코드가 오픈소스 라이선스를 베꼈는지 PR에서 탐지하는 오픈소스 라이선스 게이트"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+    { name = "Lee Woojin", email = "leemonta9482@gmail.com" },
+    { name = "Kim Minsu" },
+]
+keywords = [
+    "license-compliance", "code-provenance", "plagiarism-detection",
+    "ai-generated-code", "copyleft", "gpl", "winnowing", "supply-chain-security",
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Security",
+]
+dependencies = [
+    "pygments>=2.15",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pytest-cov", "ruff"]
+
+[project.urls]
+Homepage = "https://github.com/4thIS/opensource_contest_provenire"
+Repository = "https://github.com/4thIS/opensource_contest_provenire"
+Issues = "https://github.com/4thIS/opensource_contest_provenire/issues"
+
+[project.scripts]
+provenire = "provenire.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/provenire"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

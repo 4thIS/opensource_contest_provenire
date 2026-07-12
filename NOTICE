@@ -1,0 +1,24 @@
+Provenire
+Copyright 2026 Lee Woojin, Kim Minsu (Team 코드감식반)
+
+This product includes software developed for the
+2026 Open Source Developer Contest (오픈소스 개발자대회).
+
+Licensed under the Apache License, Version 2.0.
+
+---
+Third-party dependencies:
+
+  Pygments (BSD-2-Clause)
+    https://pygments.org/
+    Used for multi-language tokenization.
+
+Algorithm reference (not code):
+
+  Schleimer, S., Wilkerson, D. S., & Aiken, A. (2003).
+  "Winnowing: Local Algorithms for Document Fingerprinting." SIGMOD.
+
+Benchmark data:
+
+  benchmarks/ fetches source from qutebrowser (GPL-3.0-or-later) at runtime
+  for verification purposes only. No GPL code is vendored in this repository.
