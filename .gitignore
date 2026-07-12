@@ -11,3 +11,14 @@ venv/
 htmlcov/
 benchmarks/_cache/
 gpl_src.py
+
+# 팀장 전용 (커밋 금지 — 로컬에서만 본다)
+_ops/
+
+# 비밀 정보
+.env
+.env.*
+*.pem
+*.key
+*.p12
+credentials.json

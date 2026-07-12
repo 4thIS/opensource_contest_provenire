@@ -3,9 +3,12 @@
     >>> from provenire import compare
     >>> compare(suspect_code, gpl_code).similarity
     1.0
+    >>> compare(java_a, java_b, lang="java").similarity
 
 핵심: 변수명을 바꿔도 잡아낸다. (benchmarks/RESULTS.md 참조)
+새 언어 추가: provenire/languages/ 참조 (core를 고칠 필요 없다)
 """
+from . import languages
 from .core.fingerprint import fingerprint
 from .core.matcher import Match, Scanner, compare, containment, jaccard
 from .core.normalizer import normalize_raw, normalize_tokens
@@ -15,4 +18,5 @@ __all__ = [
     "Scanner", "Match", "compare",
     "fingerprint", "normalize_tokens", "normalize_raw",
     "containment", "jaccard",
+    "languages",
 ]
