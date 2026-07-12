@@ -7,32 +7,28 @@
 
     검증 결과: benchmarks/RESULTS.md
     변수명 전부 변경 시 → raw 0.0% / 토큰 정규화 100.0%
+
+언어별 규칙은 여기 없다:
+    "무엇을 구조로 볼 것인가"는 `provenire/languages/` 의 언어팩이 정한다.
+    새 언어를 추가할 때 이 파일을 고칠 필요는 없다.
 """
 from __future__ import annotations
 
 import re
 
 from pygments import lex
-from pygments.lexers import get_lexer_by_name, guess_lexer_for_filename
+from pygments.lexers import get_lexer_by_name
 from pygments.token import Token
 from pygments.util import ClassNotFound
 
-__all__ = ["normalize_raw", "normalize_tokens", "lexer_for"]
+from ..languages import LanguageSpec, get, guess
+
+__all__ = ["normalize_raw", "normalize_tokens", "resolve_spec"]
 
 
-def lexer_for(filename: str | None = None, code: str = "", lang: str | None = None):
-    """파일명/언어로 Pygments 렉서를 고른다. 실패 시 Python으로 폴백."""
-    if lang:
-        try:
-            return get_lexer_by_name(lang)
-        except ClassNotFound:
-            pass
-    if filename:
-        try:
-            return guess_lexer_for_filename(filename, code)
-        except ClassNotFound:
-            pass
-    return get_lexer_by_name("python")
+def resolve_spec(filename: str | None = None, lang: str | None = None) -> LanguageSpec:
+    """언어 이름 > 파일 확장자 > python 순으로 언어팩을 정한다."""
+    return get(lang) if lang else guess(filename)
 
 
 def normalize_raw(code: str) -> str:
@@ -40,26 +36,37 @@ def normalize_raw(code: str) -> str:
 
     이름을 바꾸면 그대로 무너진다 — Copilot 필터가 놓치는 이유.
     """
-    code = re.sub(r"#.*", "", code)
+    code = re.sub(r"//.*", "", code)                  # C 계열 한 줄 주석
+    code = re.sub(r"#.*", "", code)                   # Python·셸 주석
+    code = re.sub(r"/\*[\s\S]*?\*/", "", code)        # C 계열 블록 주석
     code = re.sub(r'"""[\s\S]*?"""', "", code)
     code = re.sub(r"'''[\s\S]*?'''", "", code)
     return re.sub(r"\s+", "", code)
 
 
-def normalize_tokens(code: str, filename: str | None = None, lang: str | None = None) -> str:
+def normalize_tokens(
+    code: str,
+    filename: str | None = None,
+    lang: str | None = None,
+) -> str:
     """토큰 정규화 — 식별자/문자열/숫자를 익명 토큰으로 치환한다.
 
-    보존하는 것: 키워드 · 빌트인 · 연산자 · 구두점  → **코드의 구조**
-    지우는 것:   변수명 · 함수명 · 문자열 · 숫자     → **표면적 차이**
+    보존하는 것: 언어팩의 `keep` (키워드·타입 등) + 연산자 · 구두점  → **구조**
+    지우는 것:   변수명 · 함수명 · 문자열 · 숫자                      → **표면**
     """
-    lexer = lexer_for(filename, code, lang)
+    spec = resolve_spec(filename, lang)
+    try:
+        lexer = get_lexer_by_name(spec.lexer)
+    except ClassNotFound:  # pragma: no cover - 언어팩 설정 오류
+        lexer = get_lexer_by_name("python")
+
     out: list[str] = []
     for tok, val in lex(code, lexer):
-        if val.strip() == "":
+        if not val.strip():
             continue
         if tok in Token.Comment:
             continue
-        if tok in Token.Keyword or tok in Token.Name.Builtin:
+        if spec.keeps(tok):
             out.append(val)          # 구조 정보 — 보존
         elif tok in Token.Name:
             out.append("ID")         # ← 핵심: 이름을 지운다

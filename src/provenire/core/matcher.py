@@ -48,25 +48,39 @@ class Scanner:
 
     mode="tokens" (기본) — 식별자 익명화. 변수명을 바꿔도 잡아낸다.
     mode="raw"           — 문자 그대로. 비교/검증용 baseline.
+
+    언어는 `lang="java"` 로 지정하거나, `filename` 확장자로 추론한다.
+    지원 언어: provenire.languages.available()
     """
 
     THRESHOLD = 0.30   # 이 이상이면 '의심'
 
-    def __init__(self, mode: str = "tokens", k: int = K_DEFAULT, w: int = W_DEFAULT):
+    def __init__(
+        self,
+        mode: str = "tokens",
+        k: int = K_DEFAULT,
+        w: int = W_DEFAULT,
+        lang: str | None = None,
+    ):
         if mode not in ("tokens", "raw"):
             raise ValueError("mode는 'tokens' 또는 'raw'")
-        self.mode, self.k, self.w = mode, k, w
+        self.mode, self.k, self.w, self.lang = mode, k, w, lang
 
-    def _fp(self, code: str, filename: str | None = None) -> set[int]:
+    def fingerprint_of(self, code: str, filename: str | None = None) -> set[int]:
+        """코드 → 정규화 → winnowing 지문."""
         text = (
-            normalize_tokens(code, filename=filename)
+            normalize_tokens(code, filename=filename, lang=self.lang)
             if self.mode == "tokens"
             else normalize_raw(code)
         )
         return fingerprint(text, k=self.k, w=self.w)
 
+    # 하위 호환
+    _fp = fingerprint_of
+
     def compare(self, suspect: str, origin: str, filename: str | None = None) -> Match:
-        fs, fo = self._fp(suspect, filename), self._fp(origin, filename)
+        fs = self.fingerprint_of(suspect, filename)
+        fo = self.fingerprint_of(origin, filename)
         return Match(
             similarity=containment(fs, fo),
             shared=len(fs & fo),
@@ -74,6 +88,16 @@ class Scanner:
         )
 
 
-def compare(suspect: str, origin: str, mode: str = "tokens") -> Match:
-    """단축 함수."""
-    return Scanner(mode=mode).compare(suspect, origin)
+def compare(
+    suspect: str,
+    origin: str,
+    mode: str = "tokens",
+    lang: str | None = None,
+    filename: str | None = None,
+) -> Match:
+    """단축 함수.
+
+        >>> compare(ai_code, gpl_code).similarity
+        >>> compare(java_a, java_b, lang="java").similarity
+    """
+    return Scanner(mode=mode, lang=lang).compare(suspect, origin, filename=filename)
