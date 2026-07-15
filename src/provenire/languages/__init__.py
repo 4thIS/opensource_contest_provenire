@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .base import LanguageSpec
 
-__all__ = ["LanguageSpec", "get", "guess", "available", "register"]
+__all__ = ["LanguageSpec", "get", "guess", "available", "register", "extensions"]
 
 # 새 언어를 추가하면 여기에 모듈 이름을 넣는다.
 _MODULES = (
@@ -47,6 +47,14 @@ _load()
 def available() -> list[str]:
     """지원하는 언어 목록."""
     return sorted(_REGISTRY)
+
+
+def extensions() -> set[str]:
+    """등록된 모든 언어의 파일 확장자 집합 (예: {".py", ".java", ".js", ".ts"}).
+
+    `provenire scan` 이 디렉터리를 순회할 때 지원 언어 파일만 고르는 데 쓴다.
+    """
+    return set(_BY_EXT)
 
 
 def get(name: str) -> LanguageSpec:
