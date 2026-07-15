@@ -21,7 +21,8 @@ __all__ = ["LanguageSpec", "get", "guess", "available", "register"]
 _MODULES = (
     "python",
     "java",
-    # "javascript",   <- T-02
+    "javascript",
+    "typescript",
 )
 
 _REGISTRY: dict[str, LanguageSpec] = {}
