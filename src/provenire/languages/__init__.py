@@ -20,7 +20,7 @@ __all__ = ["LanguageSpec", "get", "guess", "available", "register"]
 # 새 언어를 추가하면 여기에 모듈 이름을 넣는다.
 _MODULES = (
     "python",
-    # "java",         <- T-01
+    "java",
     # "javascript",   <- T-02
 )
 
