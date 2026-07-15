@@ -16,8 +16,9 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from ..core.matcher import Scanner
+from .store import FingerprintStore
 
-__all__ = ["Hit", "Index", "MockIndex"]
+__all__ = ["Hit", "Index", "MockIndex", "FileIndex", "FingerprintStore"]
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,20 @@ class _Entry:
     license: str
     url: str
     fp: frozenset[int]
+
+
+def _rank(entries: list[_Entry], fp: set[int], top_k: int) -> list[Hit]:
+    """지문과 겹치는 후보를 공유 지문이 많은 순으로 돌려준다 (선형 스캔)."""
+    hits = [
+        Hit(
+            e.project, e.file, e.symbol, e.license, e.url,
+            shared=len(fp & e.fp), total=len(e.fp),
+        )
+        for e in entries
+        if fp & e.fp
+    ]
+    hits.sort(key=lambda h: h.shared, reverse=True)
+    return hits[:top_k]
 
 
 class MockIndex:
@@ -94,13 +109,24 @@ class MockIndex:
 
     def search(self, fp: set[int], top_k: int = 10) -> list[Hit]:
         """의심 지문과 겹치는 후보를 공유 지문이 많은 순으로 돌려준다."""
-        hits = [
-            Hit(
-                e.project, e.file, e.symbol, e.license, e.url,
-                shared=len(fp & e.fp), total=len(e.fp),
-            )
-            for e in self._entries
-            if fp & e.fp
+        return _rank(self._entries, fp, top_k)
+
+
+class FileIndex:
+    """디스크(sqlite) 지문 저장소를 로드해 검색하는 실제 인덱스.
+
+        store = FingerprintStore("copyleft.db")   # 코퍼스가 채워둔 지문 DB
+        hits = FileIndex(store).search(Scanner()._fp(suspect_code))
+
+    # ponytail: 선형 스캔 — 코퍼스 Top-N(~30개) 규모엔 충분. 지문이 수만을
+    #           넘어 느려지면 index/search.py 에 MinHash LSH(datasketch)를 얹는다.
+    """
+
+    def __init__(self, store: FingerprintStore):
+        self._entries = [
+            _Entry(m["project"], m["file"], m["symbol"], m["license"], m["url"], fp)
+            for m, fp in store.entries()
         ]
-        hits.sort(key=lambda h: h.shared, reverse=True)
-        return hits[:top_k]
+
+    def search(self, fp: set[int], top_k: int = 10) -> list[Hit]:
+        return _rank(self._entries, fp, top_k)
