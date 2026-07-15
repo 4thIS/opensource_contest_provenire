@@ -12,6 +12,11 @@ htmlcov/
 benchmarks/_cache/
 gpl_src.py
 
+# 코퍼스 수집 — 내려받은 카피레프트 코드(캐시)와 빌드된 지문 DB
+# 캐시엔 GPL 원본이 들어가므로 절대 커밋 금지(§4). DB는 지문만이라 안전하지만 산출물이므로 무시.
+src/provenire/index/_corpus_cache/
+*.db
+
 # 팀장 전용 (커밋 금지 — 로컬에서만 본다)
 _ops/
 
