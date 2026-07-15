@@ -1,0 +1,134 @@
+"""코퍼스 수집기 (WP-A: A-1 수집 + A-2 청킹) — 인덱스에 "무엇을 담을까"를 채운다.
+
+파이프라인:
+    시드 URL 목록  ──fetch──▶  카피레프트 원본  ──chunk──▶  함수 단위 조각
+                                                              │
+                                          Scanner 로 지문 ◀────┘
+                                                              │
+                                          FingerprintStore.add  ─▶  copyleft.db
+
+⚠️ 저작권 (§4):
+    - GPL 원본은 **런타임에 내려받고**, 저장소에 커밋하지 않는다. (캐시는 .gitignore)
+    - DB엔 지문(해시)과 메타만 들어간다. 원본 코드는 저장하지 않는다. (store.py 참조)
+
+지금은 착수 단계다:
+    - 시드는 큐레이션된 소수의 URL (Top-N 자동 선정은 다음).
+    - Python 은 ast 로 함수 단위 청킹, 그 외 언어는 파일 단위 fallback.
+"""
+from __future__ import annotations
+
+import ast
+import hashlib
+import urllib.request
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+
+from ..core.matcher import Scanner
+from .store import FingerprintStore
+
+__all__ = ["CorpusSource", "SOURCES", "chunk", "fetch", "build_index"]
+
+_CACHE = Path(__file__).parent / "_corpus_cache"
+
+# 함수가 이보다 짧으면 지문이 안 나오고 대개 관용구다 → 청킹에서 제외.
+_MIN_CHUNK_LINES = 5
+
+
+@dataclass(frozen=True)
+class CorpusSource:
+    """인덱싱할 카피레프트 소스 한 건 (메타데이터 — 코드가 아니므로 커밋 가능)."""
+
+    project: str
+    file: str
+    license: str   # SPDX
+    url: str       # raw 소스 URL
+    lang: str = "python"
+
+
+# 큐레이션 시드. 실제 카피레프트 프로젝트의 raw 파일 URL (코드가 아니라 주소).
+# 착수용 소수. Top-N 자동 선정은 다음 단계. (DoD: 최소 30개)
+SOURCES: tuple[CorpusSource, ...] = (
+    CorpusSource(
+        project="qutebrowser",
+        file="qutebrowser/utils/utils.py",
+        license="GPL-3.0-or-later",
+        url="https://raw.githubusercontent.com/qutebrowser/qutebrowser/main/qutebrowser/utils/utils.py",
+    ),
+    CorpusSource(
+        project="qutebrowser",
+        file="qutebrowser/utils/urlutils.py",
+        license="GPL-3.0-or-later",
+        url="https://raw.githubusercontent.com/qutebrowser/qutebrowser/main/qutebrowser/utils/urlutils.py",
+    ),
+)
+
+
+def fetch(url: str) -> str:
+    """URL 을 내려받는다 (캐시됨). 캐시엔 원본이 들어가므로 .gitignore 처리돼 있다."""
+    key = hashlib.md5(url.encode("utf-8")).hexdigest()
+    cached = _CACHE / key
+    if cached.exists():
+        return cached.read_text(encoding="utf-8")
+    src = urllib.request.urlopen(url, timeout=20).read().decode("utf-8")  # noqa: S310
+    _CACHE.mkdir(parents=True, exist_ok=True)
+    cached.write_text(src, encoding="utf-8")
+    return src
+
+
+def chunk(code: str, lang: str = "python") -> list[tuple[str | None, str]]:
+    """코드를 (심볼, 조각) 목록으로 쪼갠다.
+
+    Python 은 함수 단위(ast). 그 외 언어는 파일 전체를 한 조각으로 (fallback).
+    함수 단위 매칭이 정확도에 중요하다 — 큰 파일에서 작은 함수만 베낀 경우를 잡는다.
+    """
+    if lang != "python":
+        return [(None, code)]   # ponytail: 비-Python 함수 청킹은 다음 단계(tree-sitter 등)
+
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return [(None, code)]
+
+    chunks: list[tuple[str | None, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if (node.end_lineno or 0) - node.lineno + 1 < _MIN_CHUNK_LINES:
+                continue
+            seg = ast.get_source_segment(code, node)
+            if seg:
+                chunks.append((node.name, seg))
+    return chunks
+
+
+def build_index(
+    sources: tuple[CorpusSource, ...] | list[CorpusSource],
+    store: FingerprintStore,
+    fetch: Callable[[str], str] = fetch,
+) -> FingerprintStore:
+    """시드를 내려받아 청킹하고 지문을 떠서 store 에 채운다.
+
+    fetch 를 주입할 수 있다 → 테스트는 네트워크 없이 가짜 fetch 를 쓴다.
+    한 소스가 실패해도(네트워크 등) 건너뛰고 나머지를 계속한다.
+    """
+    for src in sources:
+        try:
+            code = fetch(src.url)
+        except Exception:   # noqa: BLE001 - 네트워크 실패는 건너뛴다
+            continue
+        scanner = Scanner(lang=src.lang)
+        for symbol, piece in chunk(code, src.lang):
+            fp = scanner.fingerprint_of(piece)
+            if fp:   # 너무 짧아 지문이 안 나오는 조각은 버린다
+                store.add(
+                    fp, project=src.project, file=src.file,
+                    symbol=symbol, license=src.license, url=src.url,
+                )
+    return store
+
+
+if __name__ == "__main__":  # pragma: no cover - 실제 네트워크 빌드
+    db = FingerprintStore("copyleft.db")
+    build_index(SOURCES, db)
+    print(f"인덱싱 완료: {len(db)} 청크  →  copyleft.db")
+    db.close()
