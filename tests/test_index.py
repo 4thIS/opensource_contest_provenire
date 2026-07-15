@@ -4,7 +4,7 @@
 '겹치면 찾고, 안 겹치면 안 찾고, 메타를 정확히 실어 준다.'
 """
 from provenire import Scanner
-from provenire.index import Index, MockIndex
+from provenire.index import FileIndex, FingerprintStore, Index, MockIndex
 
 ORIGIN = '''
 def elide_filename(filename, length):
@@ -85,3 +85,51 @@ def test_results_sorted_by_shared_desc():
 
 def test_mockindex_satisfies_index_protocol():
     assert isinstance(MockIndex(), Index)
+
+
+# ─────────────────────────── FileIndex (sqlite) ───────────────────────────
+
+
+def _store_with_origin(path: str = ":memory:") -> FingerprintStore:
+    store = FingerprintStore(path)
+    store.add(Scanner()._fp(ORIGIN), project="acme", file="util.py",
+              symbol="elide_filename", license="GPL-3.0-or-later",
+              url="https://example.com/util.py")
+    return store
+
+
+def test_fileindex_finds_renamed_code():
+    """★ 디스크 인덱스도 이름만 바꾼 코드를 찾아낸다."""
+    hits = FileIndex(_store_with_origin()).search(Scanner()._fp(RENAMED))
+    assert len(hits) == 1
+    assert hits[0].project == "acme"
+    assert hits[0].license == "GPL-3.0-or-later"
+    assert hits[0].shared > 0
+
+
+def test_fileindex_ignores_unrelated_code():
+    assert FileIndex(_store_with_origin()).search(Scanner()._fp(UNRELATED)) == []
+
+
+def test_fileindex_satisfies_index_protocol():
+    assert isinstance(FileIndex(FingerprintStore()), Index)
+
+
+def test_store_persists_across_reopen(tmp_path):
+    """디스크에 저장하고 새 연결로 다시 열어도 검색된다."""
+    db = str(tmp_path / "idx.db")
+    _store_with_origin(db).close()
+    hits = FileIndex(FingerprintStore(db)).search(Scanner()._fp(RENAMED))
+    assert len(hits) == 1
+
+
+def test_store_saves_no_source_code(tmp_path):
+    """⚠️ 저작권 안전 — DB에 원본 코드가 저장되지 않는다 (지문 해시만)."""
+    db = tmp_path / "idx.db"
+    FingerprintStore(str(db)).add(
+        Scanner()._fp(ORIGIN), project="acme", file="util.py",
+        license="GPL-3.0-or-later", url="x",  # symbol(=함수명) 생략
+    )
+    raw = db.read_bytes()
+    assert b"marker" not in raw    # 원본 코드의 지역변수명이 DB에 없다
+    assert b"elidestr" not in raw
