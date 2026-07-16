@@ -1,0 +1,15 @@
+# 비밀키 커밋 차단 (CLAUDE.md §4 · §5 팀장 체크리스트)
+#
+# 설치 (팀원 각자 1회):
+#   pip install -e ".[dev]"
+#   pre-commit install
+#
+# 이후 git commit 때마다 자동 실행된다.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: detect-private-key        # .pem/.key 등 개인키 커밋 차단 — §4 핵심
+      - id: check-added-large-files   # 코퍼스 DB·캐시 등 대용량 실수 커밋 방지
+        args: ["--maxkb=500"]
+# ponytail: 토큰·비밀번호 문자열 패턴 탐지까지 필요해지면 gitleaks 훅을 얹는다.
