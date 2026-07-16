@@ -133,3 +133,48 @@ def test_store_saves_no_source_code(tmp_path):
     raw = db.read_bytes()
     assert b"marker" not in raw    # 원본 코드의 지역변수명이 DB에 없다
     assert b"elidestr" not in raw
+
+
+# ─────────────────────────── 관용구 필터 (WP-C) ───────────────────────────
+
+# 여러 원본에 흔히 나오는 관용구 (표절 신호가 아니다)
+BOILERPLATE = '''
+def __init__(self, name, value, parent=None):
+    self.name = name
+    self.value = value
+    self.parent = parent
+    self.children = []
+    self.visible = True
+    self.enabled = True
+'''
+
+
+def _store_with_idioms(copies: int = 4) -> FingerprintStore:
+    """같은 관용구를 여러 원본에 심어 '흔한 지문'을 만든다."""
+    store = FingerprintStore()
+    for i in range(copies):
+        store.add(Scanner()._fp(BOILERPLATE), project=f"lib{i}", file="m.py",
+                  license="GPL-3.0-or-later", url="x")
+    return store
+
+
+def test_common_fingerprints_flags_shared_idioms():
+    idioms = _store_with_idioms(4).common_fingerprints(min_count=4)
+    assert idioms, "4개 원본에 공통인 지문(관용구)을 찾지 못했다"
+
+
+def test_idiom_filter_removes_boilerplate_false_positive():
+    """★ 관용구만 공유하는 코드 → 필터 켜면 오탐이 사라진다."""
+    store = _store_with_idioms(4)
+    suspect = Scanner()._fp(BOILERPLATE)
+    assert FileIndex(store).search(suspect)                    # 필터 없으면 오탐
+    assert FileIndex(store, idiom_min=4).search(suspect) == [] # 필터 켜면 제거
+
+
+def test_idiom_filter_keeps_real_plagiarism():
+    """★ 관용구를 걸러도 진짜 표절(이름만 바꾼 재현)은 그대로 잡힌다."""
+    store = _store_with_idioms(4)
+    store.add(Scanner()._fp(ORIGIN), project="acme", file="util.py",
+              symbol="elide_filename", license="GPL-3.0-or-later", url="x")
+    hits = FileIndex(store, idiom_min=4).search(Scanner()._fp(RENAMED))
+    assert any(h.project == "acme" for h in hits)

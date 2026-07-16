@@ -118,15 +118,25 @@ class FileIndex:
         store = FingerprintStore("copyleft.db")   # 코퍼스가 채워둔 지문 DB
         hits = FileIndex(store).search(Scanner()._fp(suspect_code))
 
+    관용구 필터 (WP-C):
+        idiom_min 을 주면, 코퍼스의 min개 이상 조각에 공통으로 나타나는 지문
+        (= 흔한 관용구)을 원본·의심 양쪽에서 빼고 비교한다 → 오탐 감소.
+
+        FileIndex(store, idiom_min=5)   # 5개 이상 원본에 나오는 지문은 무시
+
     # ponytail: 선형 스캔 — 코퍼스 Top-N(~30개) 규모엔 충분. 지문이 수만을
     #           넘어 느려지면 index/search.py 에 MinHash LSH(datasketch)를 얹는다.
     """
 
-    def __init__(self, store: FingerprintStore):
+    def __init__(self, store: FingerprintStore, idiom_min: int | None = None):
+        self._idioms = (
+            store.common_fingerprints(idiom_min) if idiom_min else frozenset()
+        )
         self._entries = [
-            _Entry(m["project"], m["file"], m["symbol"], m["license"], m["url"], fp)
+            _Entry(m["project"], m["file"], m["symbol"], m["license"], m["url"],
+                   fp - self._idioms)
             for m, fp in store.entries()
         ]
 
     def search(self, fp: set[int], top_k: int = 10) -> list[Hit]:
-        return _rank(self._entries, fp, top_k)
+        return _rank(self._entries, fp - self._idioms, top_k)

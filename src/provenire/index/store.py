@@ -82,5 +82,19 @@ class FingerprintStore:
     def __len__(self) -> int:
         return self._db.execute("SELECT COUNT(*) FROM entries").fetchone()[0]
 
+    def common_fingerprints(self, min_count: int) -> frozenset[int]:
+        """min_count 개 이상의 서로 다른 조각(entry)에 나타나는 지문 = 관용구.
+
+        여러 무관한 원본에 공통으로 나오는 지문은 표절 신호가 아니라 흔한
+        관용구다(getter, 표준 루프·예외 처리 등). 검색에서 이 지문을 빼면
+        보일러플레이트끼리 매칭되는 오탐이 줄어든다 (IDF 개념, WP-C).
+        """
+        rows = self._db.execute(
+            "SELECT hash FROM fingerprints "
+            "GROUP BY hash HAVING COUNT(DISTINCT entry_id) >= ?",
+            (min_count,),
+        ).fetchall()
+        return frozenset(h for (h,) in rows)
+
     def close(self) -> None:
         self._db.close()
