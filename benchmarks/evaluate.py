@@ -40,6 +40,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+# Windows 콘솔 기본 인코딩(cp949)에서 한글·기호 출력이 깨지지 않게 고정한다.
+# 이게 없으면 Windows 사용자는 UnicodeEncodeError 로 재현 자체가 불가능하다.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 from provenire import Scanner  # noqa: E402
 from provenire.index import FileIndex, FingerprintStore  # noqa: E402
 from provenire.index.corpus import SOURCES, chunk, fetch  # noqa: E402
