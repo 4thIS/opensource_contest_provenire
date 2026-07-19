@@ -37,8 +37,11 @@ AI  :  def truncate_path(path_str, max_len):  ->  def ID(ID, ID):
 ### 검증된 명제 (CI가 매번 확인한다)
 | 시나리오 | raw (Copilot 수준) | **tokens (우리)** |
 |---|:--:|:--:|
-| 변수·함수명 전부 변경 | **0.0%** (놓침) | **100.0%** (탐지) |
+| 변수·함수명 전부 변경 | **8.8%** (놓침 — 임계값 30% 미만) | **100.0%** (탐지) |
 | 무관한 코드 | 0.0% | **0.0%** (오탐 없음) |
+
+> k=15 기준(2026-07-16 E-1 이후). 이전 k=25에서는 raw가 0.0%였으나,
+> **실제 LLM 재생성 탐지력이 떨어져 k를 낮췄다.** 근거: [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md) E-1 절.
 
 > 재현: `python benchmarks/poc_winnowing.py` · 상세: [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md)
 > **이 명제가 깨지면 CI가 실패한다.** 절대 깨뜨리지 말 것.

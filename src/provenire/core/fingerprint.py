@@ -18,7 +18,13 @@ import hashlib
 
 __all__ = ["Fingerprint", "fingerprint", "K_DEFAULT", "W_DEFAULT"]
 
-K_DEFAULT = 25   # k-gram 길이
+# k-gram 길이. E-1(LLM 재생성 스모크, benchmarks/RESULTS.md)에서 측정해 정했다.
+#
+#   k=25 는 raw(Copilot 필터)와의 대비를 극대화하지만, 실제 LLM 이 **이름과 함께
+#   표현·구조까지 바꿔** 재생성한 코드를 하나도 잡지 못했다(0/3).
+#   k=15 는 그 중 2/3 를 잡으면서 자체 작성 코드 오탐은 0/5 로 유지됐다.
+#   k=10 까지 낮추면 오탐이 나타나기 시작한다(1/5).
+K_DEFAULT = 15
 W_DEFAULT = 12   # winnowing 윈도우 크기
 
 Fingerprint = set  # set[int]
