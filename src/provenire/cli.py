@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import languages
+from .adapters.git import changed_code
 from .core.fingerprint import K_DEFAULT, W_DEFAULT
 from .core.matcher import Scanner
 from .core.normalizer import normalize_tokens
@@ -93,6 +94,29 @@ def _iter_source_files(paths: list[str]):
             yield str(path)
 
 
+def scan_code(
+    code: str,
+    file: str,
+    index: Index,
+    scanner: Scanner,
+    threshold: float = Scanner.THRESHOLD,
+) -> list[Finding]:
+    """코드 문자열 하나를 인덱스와 대조해 Finding 을 모은다 (검사의 최소 단위).
+
+    파일 경로 스캔(scan_paths)과 git diff 스캔(scan_changes)이 이 로직을 공유한다.
+    너무 짧아 지문이 안 나오는 조각은 조용히 건너뛴다.
+    """
+    fp = scanner.fingerprint_of(code, filename=file)
+    if not fp:
+        return []
+    findings: list[Finding] = []
+    for h in index.search(fp):
+        sim = h.shared / len(fp)
+        if sim >= threshold:
+            findings.append(Finding(file=file, hit=h, similarity=sim))
+    return findings
+
+
 def scan_paths(
     paths: list[str],
     index: Index,
@@ -107,14 +131,29 @@ def scan_paths(
     findings: list[Finding] = []
     scanner = Scanner(k=k, w=w)
     for path in _iter_source_files(paths):
-        code = _read(path)
-        fp = scanner.fingerprint_of(code, filename=path)
-        if not fp:
+        findings += scan_code(_read(path), path, index, scanner, threshold)
+    return findings
+
+
+def scan_changes(
+    changes: dict[str, str],
+    index: Index,
+    threshold: float = Scanner.THRESHOLD,
+    k: int = K_DEFAULT,
+    w: int = W_DEFAULT,
+) -> list[Finding]:
+    """(파일 → 추가된 코드) 를 인덱스와 대조한다 — `scan --diff` 의 코어.
+
+    git diff 어댑터가 준 changes 를 받아 **지원 언어 확장자만** 검사한다.
+    scan_paths 와 같은 검사 로직(scan_code)을 공유한다.
+    """
+    exts = languages.extensions()
+    findings: list[Finding] = []
+    scanner = Scanner(k=k, w=w)
+    for file, code in changes.items():
+        if Path(file).suffix.lower() not in exts:
             continue
-        for h in index.search(fp):
-            sim = h.shared / len(fp)
-            if sim >= threshold:
-                findings.append(Finding(file=path, hit=h, similarity=sim))
+        findings += scan_code(code, file, index, scanner, threshold)
     return findings
 
 
@@ -147,10 +186,20 @@ def _print_report(findings: list[Finding], paths: list[str]) -> None:
 
 def cmd_scan(args) -> int:
     index = _load_index(args)
-    findings = scan_paths(
-        args.paths, index, threshold=args.threshold, k=args.k, w=args.w
-    )
-    _print_report(findings, args.paths)
+    if args.diff:
+        changes = changed_code(args.diff)
+        findings = scan_changes(
+            changes, index, threshold=args.threshold, k=args.k, w=args.w
+        )
+        _print_report(findings, list(changes))
+    elif args.paths:
+        findings = scan_paths(
+            args.paths, index, threshold=args.threshold, k=args.k, w=args.w
+        )
+        _print_report(findings, args.paths)
+    else:
+        print("검사할 대상이 없습니다. 경로를 주거나 --diff <ref> 를 쓰세요.")
+        return 2
     return 1 if findings else 0   # ← PR 게이트가 이 코드로 실패 판정
 
 
@@ -176,7 +225,9 @@ def main(argv: list[str] | None = None) -> int:
     f.set_defaults(func=cmd_fingerprint)
 
     s = sub.add_parser("scan", help="코드를 카피레프트 인덱스와 대조한다 (PR 게이트)")
-    s.add_argument("paths", nargs="+", help="검사할 파일 또는 디렉터리")
+    s.add_argument("paths", nargs="*", help="검사할 파일 또는 디렉터리")
+    s.add_argument("--diff", metavar="REF",
+                   help="이 ref(main·HEAD~1 등) 대비 추가된 코드만 검사한다 (PR 게이트용)")
     s.add_argument("--index", help="지문 DB(sqlite) 경로. 없으면 빈 인덱스로 동작")
     s.add_argument("--against", default="copyleft",
                    help="대조 대상 (현재는 copyleft 자리표시)")
