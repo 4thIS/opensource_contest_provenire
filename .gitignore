@@ -16,6 +16,9 @@ gpl_src.py
 # 캐시엔 GPL 원본이 들어가므로 절대 커밋 금지(§4). DB는 지문만이라 안전하지만 산출물이므로 무시.
 src/provenire/index/_corpus_cache/
 *.db
+# 단, 배포용 지문 인덱스는 커밋한다 — 지문 해시 + 라이선스 메타뿐이라 원본 복원이
+# 불가능하다(저작권 안전). GitHub Action 이 이 파일을 --index 로 쓴다.
+!data/copyleft.db
 
 # 팀장 전용 (커밋 금지 — 로컬에서만 본다)
 _ops/
