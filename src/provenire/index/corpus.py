@@ -14,11 +14,21 @@
 지금은 착수 단계다:
     - 시드는 큐레이션된 소수의 URL (Top-N 자동 선정은 다음).
     - Python 은 ast 로 함수 단위 청킹, 그 외 언어는 파일 단위 fallback.
+
+인덱스 빌드 (배포용 `data/copyleft.db` 를 갱신할 때):
+
+    python -m provenire.index.corpus              # → data/copyleft.db
+    python -m provenire.index.corpus 다른경로.db   # → 지정 경로
+
+    # ponytail: 빌드된 DB를 저장소에 커밋해 배포한다(지문 해시뿐이라 저작권 안전).
+    #           시드를 바꾸거나 upstream 코드가 변하면 다시 빌드해 커밋한다.
+    #           DB가 수 MB를 넘어가면 그때 GitHub Release 자산으로 옮긴다.
 """
 from __future__ import annotations
 
 import ast
 import hashlib
+import sys
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -180,7 +190,9 @@ def build_index(
 
 
 if __name__ == "__main__":  # pragma: no cover - 실제 네트워크 빌드
-    db = FingerprintStore("copyleft.db")
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("data/copyleft.db")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    db = FingerprintStore(str(out))
     build_index(SOURCES, db)
-    print(f"인덱싱 완료: {len(db)} 청크  →  copyleft.db")
+    print(f"인덱싱 완료: {len(db)} 청크 / {len(SOURCES)} 소스  →  {out}")
     db.close()
