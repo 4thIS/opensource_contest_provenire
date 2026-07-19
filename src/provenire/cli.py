@@ -159,8 +159,11 @@ def main(argv: list[str] | None = None) -> int:
         prog="provenire",
         description="AI가 생성한 코드가 오픈소스를 베꼈는지 탐지합니다.",
     )
-    p.add_argument("-k", type=int, default=25, help="k-gram 길이 (기본 25)")
-    p.add_argument("-w", type=int, default=12, help="winnowing 윈도우 (기본 12)")
+    # 코어 기본값(K_DEFAULT/W_DEFAULT)을 참조한다 — 상수가 바뀌면 CLI도 따라간다.
+    p.add_argument("-k", type=int, default=K_DEFAULT,
+                   help=f"k-gram 길이 (기본 {K_DEFAULT})")
+    p.add_argument("-w", type=int, default=W_DEFAULT,
+                   help=f"winnowing 윈도우 (기본 {W_DEFAULT})")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     c = sub.add_parser("compare", help="두 파일의 유사도를 잰다")
