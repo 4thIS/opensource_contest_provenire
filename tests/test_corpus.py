@@ -5,7 +5,7 @@
 """
 from provenire import Scanner
 from provenire.index import FileIndex, FingerprintStore
-from provenire.index.corpus import CorpusSource, build_index, chunk
+from provenire.index.corpus import SOURCES, CorpusSource, build_index, chunk
 
 # 함수 2개짜리 원본 (하나는 길고, 하나는 너무 짧아 청킹에서 빠져야 한다)
 TWO_FUNCS = '''
@@ -70,6 +70,17 @@ def test_build_index_populates_and_detects():
     assert hits[0].project == "acme"
     assert hits[0].symbol == "elide_filename"   # 함수 단위로 매칭됐다
     assert hits[0].license == "GPL-3.0-or-later"
+
+
+def test_seed_sources_are_copyleft_and_diverse():
+    """시드 자체의 실수(라이선스 오기·URL 오타)를 잡는다. 네트워크 불필요."""
+    assert len(SOURCES) >= 25, "코퍼스 시드가 너무 적다"
+    assert len({s.project for s in SOURCES}) >= 8, "프로젝트 다양성이 부족하다"
+    assert all(
+        s.license.upper().startswith(("GPL", "AGPL", "LGPL")) for s in SOURCES
+    ), "카피레프트가 아닌 라이선스가 섞였다"
+    assert all(s.url.startswith("https://raw.githubusercontent.com/") for s in SOURCES)
+    assert len({s.url for s in SOURCES}) == len(SOURCES), "중복 URL이 있다"
 
 
 def test_build_index_skips_failed_fetch():
