@@ -52,10 +52,10 @@ from provenire.index.corpus import SOURCES, chunk, fetch  # noqa: E402
 DB = Path(__file__).resolve().parents[1] / "data" / "copyleft.db"
 BUILTINS = set(dir(builtins)) | {"self", "cls"}
 
-# 정탐 세트를 만들 때 쓸 원본 소스 수 (다운로드 최소화)
-N_SOURCES = 4
-# 소스당 뽑을 함수 수
-N_FUNCS = 6
+# 정탐 세트는 **프로젝트마다 골고루** 뽑는다.
+# (앞에서부터 N개 소스만 쓰면 시드가 프로젝트별로 묶여 있어 한 프로젝트에 편중된다)
+N_FILES_PER_PROJECT = 1    # 프로젝트당 사용할 파일 수 (다운로드 최소화)
+N_FUNCS = 3                # 파일당 뽑을 함수 수
 
 # 합격 기준 (--check). 핵심 명제가 무너지면 CI를 실패시킨다.
 MIN_RECALL_RENAMED = 0.90   # 이름 전부 변경을 90% 이상 잡아야 한다
@@ -256,17 +256,28 @@ SCENARIOS: list[tuple[str, callable]] = [
 
 
 def load_positives() -> list[tuple[str, str]]:
-    """정탐 원본 — 인덱스에 들어있는 실제 카피레프트 함수들을 런타임에 가져온다."""
+    """정탐 원본 — 인덱스에 들어있는 실제 카피레프트 함수들을 런타임에 가져온다.
+
+    **프로젝트마다 골고루** 뽑는다. 한 프로젝트에 편중되면 "다른 프로젝트·다른
+    코딩 스타일에서도 되는가"를 검증하지 못한다.
+    """
+    used: dict[str, int] = {}
     out: list[tuple[str, str]] = []
-    for src in SOURCES[:N_SOURCES]:
+    for src in SOURCES:
+        if used.get(src.project, 0) >= N_FILES_PER_PROJECT:
+            continue
         try:
             code = fetch(src.url)
         except Exception as exc:  # noqa: BLE001 - 네트워크 실패는 건너뛴다
             print(f"  (건너뜀: {src.project}/{Path(src.file).name} — {type(exc).__name__})")
             continue
+        used[src.project] = used.get(src.project, 0) + 1
         for symbol, piece in chunk(code, src.lang)[:N_FUNCS]:
             out.append((f"{src.project}::{symbol}", piece))
     return out
+    # 주: 본문이 거의 없는 함수(독스트링뿐이고 `return` 하나인 경우 등)도 걸러내지 않고
+    #     그대로 평가한다. 임의 기준으로 제외하면 수치는 좋아지지만 "유리한 것만 골랐다"는
+    #     의심을 산다. 놓친 케이스는 아래 리포트에 이름을 그대로 드러낸다.
 
 
 def detected(index: FileIndex, scanner: Scanner, code: str) -> bool:
@@ -303,7 +314,10 @@ def main() -> int:
     if not positives:
         print("\n정탐 원본을 가져오지 못했습니다 (네트워크 확인). 평가를 중단합니다.")
         return 2
-    print(f"  정탐 원본: {len(positives)} 함수  ·  오탐 세트: {len(OURS)} 자체작성 코드\n")
+    pos_projects = sorted({name.split("::")[0] for name, _ in positives})
+    print(f"  정탐 원본: {len(positives)} 함수 / {len(pos_projects)} 프로젝트"
+          f"  ·  오탐 세트: {len(OURS)} 자체작성 코드")
+    print(f"  정탐 프로젝트: {', '.join(pos_projects)}\n")
 
     scanner = Scanner(lang="python")
 
@@ -313,16 +327,21 @@ def main() -> int:
     print("  " + "-" * 48)
     recalls: dict[str, float] = {}
     scan_times: list[float] = []
+    misses: dict[str, list[str]] = {}
     for label, transform in SCENARIOS:
         hits = 0
-        for _, piece in positives:
+        for name, piece in positives:
             variant = transform(piece)
             t = time.perf_counter()
             ok = detected(index, scanner, variant)
             scan_times.append(time.perf_counter() - t)
             hits += ok
+            if not ok:
+                misses.setdefault(label, []).append(name)
         recalls[label] = hits / len(positives)
         print(f"  {label:<30}{recalls[label]:>9.1%}{len(positives) - hits:>8}")
+        for name in misses.get(label, []):
+            print(f"       └ 놓침: {name}")
     print()
 
     # ── 오탐 ──
