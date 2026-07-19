@@ -46,21 +46,73 @@ class CorpusSource:
     lang: str = "python"
 
 
-# 큐레이션 시드. 실제 카피레프트 프로젝트의 raw 파일 URL (코드가 아니라 주소).
-# 착수용 소수. Top-N 자동 선정은 다음 단계. (DoD: 최소 30개)
-SOURCES: tuple[CorpusSource, ...] = (
-    CorpusSource(
-        project="qutebrowser",
-        file="qutebrowser/utils/utils.py",
-        license="GPL-3.0-or-later",
-        url="https://raw.githubusercontent.com/qutebrowser/qutebrowser/main/qutebrowser/utils/utils.py",
-    ),
-    CorpusSource(
-        project="qutebrowser",
-        file="qutebrowser/utils/urlutils.py",
-        license="GPL-3.0-or-later",
-        url="https://raw.githubusercontent.com/qutebrowser/qutebrowser/main/qutebrowser/utils/urlutils.py",
-    ),
+def _gh(project: str, license: str, repo: str, branch: str, path: str) -> CorpusSource:
+    """GitHub raw URL 로 CorpusSource 를 만든다 (시드 목록을 짧게 유지)."""
+    return CorpusSource(
+        project=project, file=path, license=license,
+        url=f"https://raw.githubusercontent.com/{repo}/{branch}/{path}",
+    )
+
+
+# 큐레이션 시드 — 실제 카피레프트 프로젝트의 파일 주소 (코드가 아니다).
+#
+# 라이선스(SPDX)와 파일 경로는 **GitHub API 로 실재를 확인**했다 (추측 아님).
+# 카피레프트가 아닌 후보(sqlmap·fail2ban·borg·mitmproxy 등)는 탐색 단계에서 제외됐다.
+# GPL-2.0 · GPL-3.0 · AGPL-3.0 을 고루 담아 라이선스 다양성을 확보한다.
+_REPOS: tuple[tuple[str, str, str, str, tuple[str, ...]], ...] = (
+    ("qutebrowser", "GPL-3.0-or-later", "qutebrowser/qutebrowser", "main", (
+        "qutebrowser/utils/utils.py",
+        "qutebrowser/utils/urlutils.py",
+        "qutebrowser/api/cmdutils.py",
+        "qutebrowser/completion/models/miscmodels.py",
+        "qutebrowser/components/misccommands.py",
+    )),
+    ("ansible", "GPL-3.0", "ansible/ansible", "devel", (
+        "lib/ansible/_internal/_errors/_error_utils.py",
+        "lib/ansible/_internal/_templating/_jinja_common.py",
+        "lib/ansible/cli/arguments/option_helpers.py",
+    )),
+    ("OctoPrint", "AGPL-3.0", "OctoPrint/OctoPrint", "dev", (
+        "src/octoprint/filemanager/storage/common.py",
+        "src/octoprint/filemanager/util.py",
+        "src/octoprint/server/util/__init__.py",
+    )),
+    ("searxng", "AGPL-3.0", "searxng/searxng", "master", (
+        "searx/utils.py",
+        "searx/webutils.py",
+        "searx/engines/wikicommons.py",
+    )),
+    ("Radicale", "GPL-3.0", "Kozea/Radicale", "master", (
+        "radicale/httputils.py",
+        "radicale/pathutils.py",
+        "radicale/utils.py",
+    )),
+    ("ranger", "GPL-3.0", "ranger/ranger", "master", (
+        "ranger/api/commands.py",
+        "ranger/container/bookmarks.py",
+        "ranger/ext/shutil_generatorized.py",
+    )),
+    ("buildbot", "GPL-2.0", "buildbot/buildbot", "master", (
+        "master/buildbot/pbutil.py",
+        "master/buildbot/reporters/utils.py",
+        "master/buildbot/reporters/generators/utils.py",
+    )),
+    ("weblate", "GPL-3.0", "WeblateOrg/weblate", "main", (
+        "weblate/accounts/utils.py",
+        "weblate/auth/utils.py",
+        "weblate/checks/fluent/utils.py",
+    )),
+    ("gramps", "GPL-2.0", "gramps-project/gramps", "master", (
+        "gramps/gen/db/utils.py",
+        "gramps/gen/lib/json_utils.py",
+        "gramps/gen/db/conversion_tools/conversion_21.py",
+    )),
+)
+
+SOURCES: tuple[CorpusSource, ...] = tuple(
+    _gh(project, lic, repo, branch, path)
+    for project, lic, repo, branch, paths in _REPOS
+    for path in paths
 )
 
 
