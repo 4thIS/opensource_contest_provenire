@@ -30,3 +30,6 @@ _ops/
 *.key
 *.p12
 credentials.json
+# 배포 자격증명 — 원래 홈(~/.pypirc)에 두지만, 실수로 저장소에 복사해도 막는다
+.pypirc
+*.pypirc
