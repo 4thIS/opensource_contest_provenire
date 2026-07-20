@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "provenire"
-version = "0.1.0"
+version = "0.1.1"
 description = "AI가 생성한 코드가 오픈소스 라이선스를 베꼈는지 PR에서 탐지하는 오픈소스 라이선스 게이트"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,7 +19,7 @@ keywords = [
     "ai-generated-code", "copyleft", "gpl", "winnowing", "supply-chain-security",
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3.10",
@@ -42,6 +42,12 @@ Issues = "https://github.com/4thIS/opensource_contest_provenire/issues"
 
 [project.scripts]
 provenire = "provenire.cli:main"
+
+# 소스 배포판(sdist)에서 팀 내부 문서를 뺀다.
+# docs/ 는 작업 지시서·구현계획·개발환경 안내라 패키지 사용자에겐 쓸모가 없다.
+# (tests·benchmarks 는 남긴다 — 받은 사람이 검증·재현할 수 있어야 한다)
+[tool.hatch.build.targets.sdist]
+exclude = ["docs/"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/provenire"]
