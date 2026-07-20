@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import sys
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 
 from . import languages
@@ -157,15 +158,37 @@ def scan_changes(
     return findings
 
 
+def _default_index_path() -> Path | None:
+    """패키지에 동봉된 카피레프트 인덱스 경로. 없으면 None.
+
+    `pip install provenire` 로 설치하면 wheel 에 동봉된 copyleft.db 가
+    `<site-packages>/provenire/data/copyleft.db` 로 들어간다(pyproject force-include).
+    이 경우 --index 를 안 줘도 이 인덱스로 실제 탐지한다.
+
+    editable/소스 실행에선 data/copyleft.db 가 저장소 루트에 있어 이 경로엔 없다
+    → None 을 돌려주고, 그때는 --index 를 명시하거나 빈 인덱스로 동작한다.
+    """
+    try:
+        p = files("provenire") / "data" / "copyleft.db"
+        return Path(str(p)) if p.is_file() else None
+    except (ModuleNotFoundError, FileNotFoundError, TypeError):
+        return None
+
+
 def _load_index(args) -> Index:
     """스캔에 쓸 인덱스를 준비한다.
 
-    --index <db> 가 주어지고 파일이 있으면 실제 sqlite 지문 DB(FileIndex)를,
-    없으면 빈 MockIndex 를 돌려준다. (실제 카피레프트 DB 는 팀장이 코퍼스로 채운다)
+    우선순위:
+        ① --index <db> 를 명시하고 파일이 있으면 그 sqlite 지문 DB(FileIndex)
+        ② 없으면 패키지에 동봉된 기본 인덱스(설치본에서만 존재)
+        ③ 그래도 없으면 빈 MockIndex (소스 실행 등)
     """
     db = getattr(args, "index", None)
     if db and Path(db).exists():
         return FileIndex(FingerprintStore(db))
+    default = _default_index_path()
+    if default is not None:
+        return FileIndex(FingerprintStore(str(default)))
     return MockIndex()
 
 

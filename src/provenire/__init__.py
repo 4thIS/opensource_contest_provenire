@@ -13,7 +13,7 @@ from .core.fingerprint import fingerprint
 from .core.matcher import Match, Scanner, compare, containment, jaccard
 from .core.normalizer import normalize_raw, normalize_tokens
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 __all__ = [
     "Scanner", "Match", "compare",
     "fingerprint", "normalize_tokens", "normalize_raw",

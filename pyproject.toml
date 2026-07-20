@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "provenire"
-version = "0.0.1"
+version = "0.1.0"
 description = "AI가 생성한 코드가 오픈소스 라이선스를 베꼈는지 PR에서 탐지하는 오픈소스 라이선스 게이트"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -45,6 +45,13 @@ provenire = "provenire.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/provenire"]
+
+# 카피레프트 지문 DB 를 wheel 에 동봉한다 — 저장소 구조(data/)는 그대로 두고
+# 설치 시 <site-packages>/provenire/data/copyleft.db 로 들어가게 한다.
+# 이게 있어야 `pip install provenire` 후 --index 없이도 scan 이 실제로 탐지한다.
+# (해시+메타뿐이라 저작권 안전 — CLAUDE.md §4)
+[tool.hatch.build.targets.wheel.force-include]
+"data/copyleft.db" = "provenire/data/copyleft.db"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
