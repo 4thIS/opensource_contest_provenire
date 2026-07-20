@@ -139,15 +139,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0       # required — the base commit must exist for the diff
-      - uses: 4thIS/provenire-action@v1
+      - uses: 4thIS/opensource_contest_provenire/.github/action@main
         with:
-          index: copyleft.db   # copyleft fingerprint DB (optional; empty index = always pass)
           fail-on: true        # fail the check on a match (false = comment only)
 ```
+
+The copyleft fingerprint index ships **inside the package**, so it works with no extra setup.
+Point at your own DB with `index: path/to/your.db` if you build one.
 
 Notes:
 - **`fetch-depth: 0` is required.** The default shallow checkout has no base commit, so `--diff` cannot compute the added lines.
 - **Fork PRs** run with a read-only token, so the comment step is skipped; the failing check still signals the problem.
+- **Start with `fail-on: false`.** Let it comment for a week before it blocks anyone — that is how we found (and fixed) a false-positive class in our own repo.
 
 ---
 

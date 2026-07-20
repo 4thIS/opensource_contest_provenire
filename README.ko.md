@@ -88,8 +88,10 @@ $ provenire compare ai_output.py gpl_origin.py
 pip install provenire
 ```
 
+카피레프트 지문 인덱스가 **패키지에 들어 있어** 설치 직후 바로 검사됩니다.
+
 ```bash
-# 지금은 소스에서
+# 소스에서 개발하려면
 git clone https://github.com/4thIS/opensource_contest_provenire.git
 cd opensource_contest_provenire
 pip install -e ".[dev]"
@@ -98,9 +100,14 @@ pip install -e ".[dev]"
 ## 사용법
 
 ```bash
-provenire compare <의심코드> <원본>     # 두 파일의 유사도
-provenire fingerprint <파일>            # 지문 미리보기
+provenire scan <경로>                   # 파일·폴더 검사 — 내장 인덱스로 바로 동작
+provenire scan --diff <ref>             # <ref> 이후 추가된 코드만 검사 (PR 게이트)
+provenire compare <의심코드> <원본>      # 두 파일의 유사도
+provenire fingerprint <파일>             # 지문 미리보기
+provenire scan <경로> --index <db>       # ...직접 만든 지문 DB를 쓰려면
 ```
+
+표절이 발견되면 **종료 코드 1** 로 끝나므로 CI 에서 그대로 게이트로 쓸 수 있습니다.
 
 ```python
 from provenire import compare
@@ -108,7 +115,50 @@ from provenire import compare
 m = compare(ai_generated_code, gpl_source)
 if m.is_suspicious:
     print(f"표절 의심: {m.similarity:.1%}")
+
+# 다른 언어
+compare(java_a, java_b, lang="java")
 ```
+
+---
+
+## GitHub Action
+
+PR 을 열 때마다 자동으로 검사합니다. Provenire 는 **그 PR 에서 추가된 코드만**(`scan --diff`)
+훑어서, 카피레프트와 겹치면 PR 에 코멘트를 달고 체크를 실패시킵니다.
+
+```yaml
+# .github/workflows/provenire.yml
+name: Provenire
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write        # PR 코멘트를 달려면 필요하다
+jobs:
+  license-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0       # 필수 — base 커밋이 있어야 diff 를 계산한다
+      - uses: 4thIS/opensource_contest_provenire/.github/action@main
+        with:
+          fail-on: true        # 발견 시 체크 실패 (false = 코멘트만)
+```
+
+걸리면 PR 에 이렇게 달립니다:
+
+```
+⚠️ Provenire — 카피레프트 유사 코드가 발견되었습니다
+
+  98.2%  src/utils.py
+     ↳ qutebrowser/utils.py :: sanitize_filename  [GPL-3.0-or-later]
+```
+
+**주의할 점**
+- **`fetch-depth: 0` 은 필수입니다.** 기본 checkout 은 커밋 하나만 받아와 base 가 없으므로 `--diff` 가 동작하지 않습니다.
+- **fork 에서 온 PR** 은 토큰이 읽기 전용이라 코멘트가 생략됩니다. 체크 실패로는 알려줍니다.
+- **처음에는 `fail-on: false` 로 시작하세요.** 일주일쯤 경고만 받아보고 켜는 편이 안전합니다 — 우리도 그렇게 하다가 오탐 한 종류를 발견해 고쳤습니다.
 
 ---
 
@@ -118,11 +168,13 @@ if m.is_suspicious:
 - [x] 토큰 정규화 (식별자 익명화) — **핵심 차별점**
 - [x] 유사도 판정 (containment)
 - [x] CLI (`compare` / `fingerprint`)
-- [ ] **카피레프트 코퍼스 인덱스** (LSH/MinHash)
-- [ ] **`provenire scan --against copyleft`** — 인덱스 대조
-- [ ] **GitHub Action** — PR 인라인 코멘트
+- [x] 언어팩 구조 — Python · Java · JavaScript · TypeScript
+- [x] **카피레프트 지문 인덱스 동봉** — 설치 즉시 검사된다
+- [x] **`provenire scan`** — 파일 검사 및 `--diff` PR 게이트
+- [x] **GitHub Action** — PR 코멘트 + 체크 실패 ([사용법](#github-action))
+- [ ] 인덱스 확장 (LSH/MinHash) — 코퍼스를 더 키우기 위해
 - [ ] LLM 2차 판정 (관용구 vs 구조적 재현)
-- [ ] 다언어 지원 (Pygments 500+ 언어)
+- [ ] 더 많은 언어 (Go, C++ 등)
 - [ ] pre-commit 훅
 
 ---
