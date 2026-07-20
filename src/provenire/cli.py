@@ -23,6 +23,13 @@ from .core.matcher import Scanner
 from .core.normalizer import normalize_tokens
 from .index import FileIndex, FingerprintStore, Hit, Index, MockIndex
 
+# Windows 콘솔 기본 인코딩(cp949)에서 한글·기호(↳) 출력이 깨지지 않게 고정한다.
+# 이게 없으면 표절을 '찾았을 때'(리포트 출력) UnicodeEncodeError 로 CLI 가 죽는다.
+# CI(Linux)·pytest(출력 캡처)에서는 안 드러나고 실제 한국어 Windows 콘솔에서만 터진다.
+# benchmarks/*.py 와 같은 방식. errors="replace" 로 어떤 환경에서도 죽지 않는다.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 RED, YEL, GRN, DIM, RST = "\033[31m", "\033[33m", "\033[32m", "\033[2m", "\033[0m"
 
 
