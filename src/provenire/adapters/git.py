@@ -36,10 +36,18 @@ def parse_added_code(diff_text: str) -> dict[str, str]:
 
 
 def run_git_diff(ref: str, cwd: str = ".") -> str:
-    """`git diff --unified=3 <ref> --` 를 실행해 unified diff 텍스트를 돌려준다."""
+    """`git diff --unified=3 <ref> --` 를 실행해 unified diff 텍스트를 돌려준다.
+
+    인코딩을 **UTF-8 로 고정**한다. `text=True` 만 주면 파이썬이 시스템 기본
+    인코딩으로 디코딩하는데, Windows 한국어 환경은 cp949 라 UTF-8 바이트(한글
+    주석·em dash 등)를 만나면 UnicodeDecodeError 로 죽는다. git diff 출력은
+    UTF-8 이므로 명시적으로 맞춰준다. `errors="replace"` 로 깨진 바이트가 있어도
+    크래시 대신 대체 문자로 넘어간다. (이슈 #22)
+    """
     out = subprocess.run(
         ["git", "diff", "--unified=3", ref, "--"],
-        capture_output=True, text=True, cwd=cwd, check=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=cwd, check=True,
     )
     return out.stdout
 
