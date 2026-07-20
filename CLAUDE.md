@@ -79,6 +79,9 @@ ruff check .                        # 린트
 python benchmarks/poc_winnowing.py  # 핵심 명제 검증
 ```
 
+> 🪟 **Windows에서 개발한다면** [`docs/02_Windows_개발환경.md`](docs/02_Windows_개발환경.md) 를 먼저 읽는다.
+> 한국어 Windows의 `cp949` 인코딩 때문에 같은 문제를 **네 번** 겪었다. 규칙 두 개만 지키면 안 터진다.
+
 ---
 
 ## 2. 역할 분담
