@@ -148,9 +148,12 @@ def test_scan_changes_skips_unsupported_extension():
 
 
 def _git(cwd, *args):
+    # encoding="utf-8" 고정: 한글 커밋 메시지 등 비ASCII 출력을 Windows 기본
+    # cp949 로 읽다 리더 스레드에서 UnicodeDecodeError 가 나는 것을 막는다 (이슈 #22)
     subprocess.run(
         ["git", "-c", "user.email=t@t", "-c", "user.name=t", *args],
         cwd=cwd, check=True, capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
     )
 
 
@@ -196,6 +199,32 @@ def test_scan_diff_exit_code_1_on_detection(tmp_path, monkeypatch):
     db = _build_db(tmp_path / "copyleft.db")
     monkeypatch.chdir(tmp_path)
     assert main(["scan", "--diff", "HEAD~1", "--index", db]) == 1
+
+
+def test_changed_code_handles_korean_comments(tmp_path):
+    """한글/유니코드 주석이 있어도 diff 를 정상 파싱한다 (이슈 #22 회귀 방지).
+
+    Windows 한국어 환경(cp949)에서 run_git_diff 가 UTF-8 한글 주석을 디코딩하다
+    UnicodeDecodeError 로 크래시하던 버그. encoding="utf-8" 명시로 플랫폼 무관하게
+    동작해야 한다. em dash(—) 같은 비ASCII 문자도 포함해 검증한다.
+    """
+    korean = (
+        "# 사용자 이름을 정리한다 — 앞뒤 공백 제거\n"
+        "def clean(name):\n"
+        "    return name.strip()\n"
+    )
+    _git(tmp_path, "init")
+    (tmp_path / "base.py").write_text("x = 1\n", encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-m", "base")
+
+    (tmp_path / "korean.py").write_text(korean, encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-m", "한글 주석 추가")
+
+    changes = changed_code("HEAD~1", cwd=str(tmp_path))
+    assert "korean.py" in changes
+    assert "def clean(name):" in changes["korean.py"]
 
 
 def test_scan_diff_exit_code_0_when_clean(tmp_path, monkeypatch):
