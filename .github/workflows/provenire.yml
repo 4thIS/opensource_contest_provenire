@@ -1,0 +1,21 @@
+name: Provenire
+
+# 우리 저장소에 우리 게이트를 붙인다 (dogfooding).
+# 기존 CI(ci.yml)와 별개 워크플로 — ci.yml 은 절대 건드리지 않는다.
+on: pull_request
+
+permissions:
+  contents: read
+  pull-requests: write   # PR 코멘트를 달기 위해 필요
+
+jobs:
+  license-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # base 커밋이 있어야 git diff <base> 가 동작한다
+      - uses: ./.github/action
+        with:
+          index: data/copyleft.db   # 팀장이 채운 실제 카피레프트 지문 DB
+          fail-on: false            # 초기: 우리 PR을 막지 않고 경고만 (안정화 후 true)

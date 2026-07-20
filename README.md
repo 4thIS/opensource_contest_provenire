@@ -102,6 +102,8 @@ pip install provenire
 ```bash
 provenire compare <suspect> <origin>   # similarity between two files
 provenire fingerprint <file>           # preview the fingerprint
+provenire scan <path> --index <db>     # scan files against a copyleft index
+provenire scan --diff <ref> --index <db>   # scan only the code added since <ref> (PR gate)
 ```
 
 ```python
@@ -117,6 +119,37 @@ compare(java_a, java_b, lang="java")
 
 ---
 
+## GitHub Action
+
+Gate every pull request automatically. Provenire scans **only the code added in the PR**
+(`scan --diff`), comments on the PR when a copyleft match is found, and can fail the check.
+
+```yaml
+# .github/workflows/provenire.yml
+name: Provenire
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write        # required to comment on the PR
+jobs:
+  license-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0       # required — the base commit must exist for the diff
+      - uses: 4thIS/provenire-action@v1
+        with:
+          index: copyleft.db   # copyleft fingerprint DB (optional; empty index = always pass)
+          fail-on: true        # fail the check on a match (false = comment only)
+```
+
+Notes:
+- **`fetch-depth: 0` is required.** The default shallow checkout has no base commit, so `--diff` cannot compute the added lines.
+- **Fork PRs** run with a read-only token, so the comment step is skipped; the failing check still signals the problem.
+
+---
+
 ## Roadmap
 
 - [x] Winnowing fingerprint engine
@@ -125,8 +158,8 @@ compare(java_a, java_b, lang="java")
 - [x] CLI (`compare` / `fingerprint`)
 - [x] Pluggable language packs
 - [ ] **Copyleft corpus index** (LSH / MinHash)
-- [ ] **`provenire scan --against copyleft`**
-- [ ] **GitHub Action** — inline PR comments
+- [x] **`provenire scan`** — file scan & `--diff` PR gate
+- [x] **GitHub Action** — PR comment + failing check ([usage](#github-action))
 - [ ] LLM second-pass judgment (idiom vs. structural reproduction)
 - [ ] More languages (Java, JS/TS, Go, C++)
 - [ ] pre-commit hook

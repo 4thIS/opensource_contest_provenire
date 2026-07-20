@@ -1,0 +1,75 @@
+name: "Provenire License Gate"
+description: "AI가 생성한 코드가 카피레프트 오픈소스를 베꼈는지 PR에서 검사한다"
+branding:
+  icon: "shield"
+  color: "purple"
+
+inputs:
+  index:
+    description: "카피레프트 지문 DB(sqlite) 경로. 없으면 빈 인덱스로 동작(항상 통과)"
+    required: false
+  base:
+    description: "비교 기준 ref. 없으면 PR의 base 커밋을 쓴다"
+    required: false
+  fail-on:
+    description: "의심 발견 시 체크를 실패시킬지 (true/false)"
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: provenire 설치
+      shell: bash
+      # github.action_path = <repo>/.github/action → ../.. = 저장소 루트
+      run: pip install -e "${{ github.action_path }}/../.."
+
+    - name: 스캔
+      id: scan
+      shell: bash
+      run: |
+        BASE="${{ inputs.base }}"
+        [ -z "$BASE" ] && BASE="${{ github.event.pull_request.base.sha }}"
+        if [ -z "$BASE" ]; then
+          echo "::error::비교 기준 ref가 없습니다. pull_request 이벤트이거나 base 입력이 필요합니다."
+          exit 2
+        fi
+        ARGS=(scan --diff "$BASE")
+        [ -n "${{ inputs.index }}" ] && ARGS+=(--index "${{ inputs.index }}")
+        echo "provenire ${ARGS[*]}"
+        set +e
+        provenire "${ARGS[@]}" > report.txt 2>&1
+        code=$?
+        set -e
+        echo "exit=$code" >> "$GITHUB_OUTPUT"
+        cat report.txt
+
+    - name: PR 코멘트
+      # 의심(exit 1)일 때만 코멘트를 단다. clean(0)이면 조용히 넘어간다 = 소음 방지.
+      if: steps.scan.outputs.exit == '1' && github.event.pull_request.number
+      continue-on-error: true   # fork PR은 토큰이 읽기전용 → 코멘트 실패해도 체크는 유지
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        {
+          echo "## ⚠️ Provenire — 카피레프트 유사 코드가 발견되었습니다"
+          echo
+          echo '```'
+          cat report.txt
+          echo '```'
+          echo
+          echo "그대로 머지하면 **소스 공개 의무**가 발생할 수 있습니다. 다시 작성하거나 라이선스를 검토하세요."
+        } > comment.md
+        gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
+
+    - name: 체크 실패 처리
+      if: steps.scan.outputs.exit == '1' && inputs.fail-on == 'true'
+      shell: bash
+      run: |
+        echo "::error::카피레프트 유사 코드가 발견되어 체크를 실패시킵니다 (fail-on=true)."
+        exit 1
