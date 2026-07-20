@@ -56,15 +56,36 @@ class _Entry:
     fp: frozenset[int]
 
 
-def _rank(entries: list[_Entry], fp: set[int], top_k: int) -> list[Hit]:
-    """지문과 겹치는 후보를 공유 지문이 많은 순으로 돌려준다 (선형 스캔)."""
+# 이보다 적게 겹치면 후보로 보지 않는다.
+#
+# 왜 필요한가: containment 는 `공유/전체` 비율이라 **지문이 몇 개 없을 때 무의미하게
+# 부풀려진다.** 지문 4개 중 2개만 겹쳐도 50%, 1개 중 1개면 100% 가 되어 임계값(30%)을
+# 훌쩍 넘는다. `scan --diff` 는 PR에서 추가된 줄만 보므로 작은 PR일수록 이 문제가 심하다.
+# 실제로 우리 저장소 커밋 25개를 스캔했을 때 **23%(13건 중 3건)가 오탐**이었다.
+#
+# 실측으로 정한 값 (benchmarks/RESULTS.md "작은 diff 오탐" 절):
+#   min_shared=1 → Recall 98.1% / 오탐 3건
+#   min_shared=3 → Recall 92.6% / 오탐 0건   ← 채택
+#   min_shared=5 → Recall 88.9% / 오탐 0건
+# PR 게이트에서 오탐은 도구를 꺼버리게 만든다. 정탐 일부(대개 아주 짧은 조각)를
+# 내주더라도 오탐 0 을 택했다.
+MIN_SHARED = 3
+
+
+def _rank(
+    entries: list[_Entry], fp: set[int], top_k: int, min_shared: int = MIN_SHARED
+) -> list[Hit]:
+    """지문과 겹치는 후보를 공유 지문이 많은 순으로 돌려준다 (선형 스캔).
+
+    `min_shared` 개 미만으로 겹치는 후보는 통계적으로 무의미하므로 제외한다.
+    """
     hits = [
         Hit(
             e.project, e.file, e.symbol, e.license, e.url,
             shared=len(fp & e.fp), total=len(e.fp),
         )
         for e in entries
-        if fp & e.fp
+        if len(fp & e.fp) >= min_shared
     ]
     hits.sort(key=lambda h: h.shared, reverse=True)
     return hits[:top_k]

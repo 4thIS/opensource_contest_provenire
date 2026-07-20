@@ -158,6 +158,27 @@ def _store_with_idioms(copies: int = 4) -> FingerprintStore:
     return store
 
 
+def test_tiny_overlap_is_not_reported():
+    """★ 작은 diff 오탐 방지 — 몇 개 안 겹치는 후보는 후보로 치지 않는다.
+
+    containment 는 `공유/전체` 라서 지문이 적으면 무의미하게 부풀려진다
+    (4개 중 2개 = 50%). scan --diff 가 PR의 추가 줄만 볼 때 실제로 오탐이
+    터졌다. MIN_SHARED 미만 겹침은 검색에서 제외한다. (RESULTS.md 참조)
+    """
+    from provenire.index import MIN_SHARED, _Entry, _rank
+
+    origin_fp = frozenset(range(100))
+    entries = [_Entry("acme", "u.py", "f", "GPL-3.0", "x", origin_fp)]
+
+    # MIN_SHARED 미만만 겹치는 의심 지문 → 비율은 100%지만 후보가 아니어야 한다
+    tiny = set(range(MIN_SHARED - 1))
+    assert _rank(entries, tiny, top_k=10) == []
+
+    # MIN_SHARED 이상 겹치면 정상적으로 잡힌다
+    enough = set(range(MIN_SHARED))
+    assert len(_rank(entries, enough, top_k=10)) == 1
+
+
 def test_common_fingerprints_flags_shared_idioms():
     idioms = _store_with_idioms(4).common_fingerprints(min_count=4)
     assert idioms, "4개 원본에 공통인 지문(관용구)을 찾지 못했다"
