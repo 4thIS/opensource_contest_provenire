@@ -10,9 +10,13 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
+# 두 사람 모두 email 을 적는다.
+# PEP 621 은 email 이 있는 저자를 Author-email 로, 없는 저자를 Author 로 나눠 넣는다.
+# 한쪽만 email 이 있으면 PyPI 페이지의 "Author" 에 email 없는 사람만 표시되어
+# 실제 저자 구성과 다르게 보인다. (0.1.1 까지 Kim Minsu 만 Author 로 노출됐다)
 authors = [
     { name = "Lee Woojin", email = "leemonta9482@gmail.com" },
-    { name = "Kim Minsu" },
+    { name = "Kim Minsu", email = "minsoo0585@gmail.com" },
 ]
 keywords = [
     "license-compliance", "code-provenance", "plagiarism-detection",
