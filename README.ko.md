@@ -1,15 +1,15 @@
 # Provenire
 
-**한국어** · [English](README.md)
+**한국어** · [English](https://github.com/4thIS/opensource_contest_provenire/blob/main/README.md)
 
 > **AI가 생성한 코드가 오픈소스 라이선스를 베꼈는지, PR에서 잡아내는 오픈소스 라이선스 게이트**
 
 [![PyPI](https://img.shields.io/pypi/v/provenire.svg)](https://pypi.org/project/provenire/)
 [![Downloads](https://img.shields.io/pypi/dm/provenire.svg)](https://pypi.org/project/provenire/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/4thIS/opensource_contest_provenire/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Tests](https://github.com/4thIS/opensource_contest_provenire/actions/workflows/ci.yml/badge.svg)](https://github.com/4thIS/opensource_contest_provenire/actions/workflows/ci.yml)
-[![Status](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#로드맵)
+[![Status](https://img.shields.io/badge/status-alpha-yellow.svg)](#로드맵)
 
 `provenire` — 라틴어 *"기원하다"*. 코드가 **어디서 왔는지(provenance)** 를 추적합니다.
 
@@ -78,7 +78,7 @@ $ provenire compare ai_output.py gpl_origin.py
 | 이름변경 + 주석삭제 + 재포맷 | **0.0%** (놓침) | **86.4%** (탐지) |
 | 무관한 코드 (음성대조) | 0% | **0%** (오탐 없음) |
 
-> 재현: [`benchmarks/`](benchmarks/) · 상세: [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md)
+> 재현: [`benchmarks/`](https://github.com/4thIS/opensource_contest_provenire/tree/main/benchmarks) · 상세: [`benchmarks/RESULTS.md`](https://github.com/4thIS/opensource_contest_provenire/blob/main/benchmarks/RESULTS.md)
 
 ---
 
@@ -199,11 +199,11 @@ PR diff (추가된 줄)
 ## 기여
 
 새 언어·새 라이선스 규칙은 **파일 하나 추가**로 확장됩니다.
-[`CONTRIBUTING.md`](CONTRIBUTING.md)를 봐주세요. `good first issue` 환영합니다.
+[`CONTRIBUTING.md`](https://github.com/4thIS/opensource_contest_provenire/blob/main/CONTRIBUTING.md)를 봐주세요. `good first issue` 환영합니다.
 
 ## 라이선스
 
-[Apache-2.0](LICENSE) — 특허 조항 포함. 자유롭게 쓰시되 출처를 남겨주세요.
+[Apache-2.0](https://github.com/4thIS/opensource_contest_provenire/blob/main/LICENSE) — 특허 조항 포함. 자유롭게 쓰시되 출처를 남겨주세요.
 
 > **Provenire는 법률 자문이 아닙니다.** 의심 구간을 알려주는 도구이지 판결이 아닙니다.
 

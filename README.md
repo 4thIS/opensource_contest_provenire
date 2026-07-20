@@ -1,15 +1,15 @@
 # Provenire
 
-**English** · [한국어](README.ko.md)
+**English** · [한국어](https://github.com/4thIS/opensource_contest_provenire/blob/main/README.ko.md)
 
 > **Catch AI-generated code that copied open-source licenses — right in the pull request.**
 
 [![PyPI](https://img.shields.io/pypi/v/provenire.svg)](https://pypi.org/project/provenire/)
 [![Downloads](https://img.shields.io/pypi/dm/provenire.svg)](https://pypi.org/project/provenire/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/4thIS/opensource_contest_provenire/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Tests](https://github.com/4thIS/opensource_contest_provenire/actions/workflows/ci.yml/badge.svg)](https://github.com/4thIS/opensource_contest_provenire/actions/workflows/ci.yml)
-[![Status](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#roadmap)
+[![Status](https://img.shields.io/badge/status-alpha-yellow.svg)](#roadmap)
 
 *provenire* — Latin, *"to originate."* It traces where your code **came from**.
 
@@ -87,7 +87,7 @@ Benchmarked against **real GPL-3.0 code** (`qutebrowser/utils/utils.py`).
 Across `k = 10…30`, the token engine catches **100%** with **0% false positives**,
 while the raw engine **collapses to 0%**.
 
-> Reproduce it yourself: [`benchmarks/`](benchmarks/) · Details: [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md)
+> Reproduce it yourself: [`benchmarks/`](https://github.com/4thIS/opensource_contest_provenire/tree/main/benchmarks) · Details: [`benchmarks/RESULTS.md`](https://github.com/4thIS/opensource_contest_provenire/blob/main/benchmarks/RESULTS.md)
 
 ---
 
@@ -206,7 +206,7 @@ SPEC = LanguageSpec(
 ```
 
 Register it in `languages/__init__.py`, add a test, done.
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) — `good first issue` welcome.
+See [`CONTRIBUTING.md`](https://github.com/4thIS/opensource_contest_provenire/blob/main/CONTRIBUTING.md) — `good first issue` welcome.
 
 ---
 
@@ -218,11 +218,11 @@ The most valuable contributions right now:
 2. **False-positive reports** — boilerplate that gets wrongly flagged
 3. **Benchmark cases** — especially code an LLM actually regenerated
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+See [`CONTRIBUTING.md`](https://github.com/4thIS/opensource_contest_provenire/blob/main/CONTRIBUTING.md).
 
 ## License
 
-[Apache-2.0](LICENSE) — patent grant included. Use it freely; keep the attribution.
+[Apache-2.0](https://github.com/4thIS/opensource_contest_provenire/blob/main/LICENSE) — patent grant included. Use it freely; keep the attribution.
 
 > **Provenire is not legal advice.** It flags suspicious regions. It does not render a verdict.
 
