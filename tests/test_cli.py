@@ -3,9 +3,12 @@
 핵심 설계: 로직(`scan_paths`)이 **인덱스를 인자로 받는 순수 함수**라서
 MockIndex 를 주입해 실제 코퍼스 없이 탐지/오탐/exit code 를 검증한다.
 """
+import argparse
+from pathlib import Path
+
 from provenire import Scanner
-from provenire.cli import main, scan_paths
-from provenire.index import FingerprintStore, MockIndex
+from provenire.cli import _load_index, main, scan_paths
+from provenire.index import FileIndex, FingerprintStore, MockIndex
 
 # 인덱스에 심을 "카피레프트 원본" (자체 작성 코드 — 저작권 안전)
 GPL_LIKE = '''
@@ -111,3 +114,33 @@ def test_scan_exit_code_0_when_clean(tmp_path):
     f = tmp_path / "clean.py"
     f.write_text(CLEAN, encoding="utf-8")
     assert main(["scan", str(f)]) == 0
+
+
+# ─────────────────────────── _load_index 폴백 (내장 인덱스) ───────────────────────────
+#
+# T-06: `pip install provenire` 후 --index 없이도 동봉 인덱스로 탐지되게 했다.
+# 동봉 db 는 src/provenire/ 밑이 아니라 설치본에만 있으므로, 패키징에 의존하지 않도록
+# _default_index_path 를 monkeypatch 해 _load_index 의 세 분기를 검증한다.
+
+
+def _args(index=None):
+    return argparse.Namespace(index=index)
+
+
+def test_load_index_uses_explicit_index(tmp_path):
+    """① --index 를 명시하면 그 db 를 FileIndex 로 로드한다."""
+    db = _build_db(tmp_path / "explicit.db")
+    assert isinstance(_load_index(_args(index=db)), FileIndex)
+
+
+def test_load_index_falls_back_to_bundled(tmp_path, monkeypatch):
+    """② --index 가 없으면 패키지 동봉 인덱스를 기본으로 쓴다."""
+    db = _build_db(tmp_path / "bundled.db")
+    monkeypatch.setattr("provenire.cli._default_index_path", lambda: Path(db))
+    assert isinstance(_load_index(_args(index=None)), FileIndex)
+
+
+def test_load_index_empty_when_none_available(monkeypatch):
+    """③ --index 도 동봉 인덱스도 없으면 빈 MockIndex 로 동작한다."""
+    monkeypatch.setattr("provenire.cli._default_index_path", lambda: None)
+    assert isinstance(_load_index(_args(index=None)), MockIndex)

@@ -102,8 +102,9 @@ pip install provenire
 ```bash
 provenire compare <suspect> <origin>   # similarity between two files
 provenire fingerprint <file>           # preview the fingerprint
-provenire scan <path> --index <db>     # scan files against a copyleft index
-provenire scan --diff <ref> --index <db>   # scan only the code added since <ref> (PR gate)
+provenire scan <path>                  # scan files — bundled copyleft index, works out of the box
+provenire scan --diff <ref>            # scan only the code added since <ref> (PR gate)
+provenire scan <path> --index <db>     # ...or point at your own fingerprint DB
 ```
 
 ```python
@@ -157,7 +158,8 @@ Notes:
 - [x] Similarity judgment (containment)
 - [x] CLI (`compare` / `fingerprint`)
 - [x] Pluggable language packs
-- [ ] **Copyleft corpus index** (LSH / MinHash)
+- [x] **Bundled copyleft index** — ships with the package; `scan` works out of the box
+- [ ] Scale the index (LSH / MinHash) for larger corpora
 - [x] **`provenire scan`** — file scan & `--diff` PR gate
 - [x] **GitHub Action** — PR comment + failing check ([usage](#github-action))
 - [ ] LLM second-pass judgment (idiom vs. structural reproduction)
