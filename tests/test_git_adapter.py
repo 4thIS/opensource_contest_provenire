@@ -148,9 +148,12 @@ def test_scan_changes_skips_unsupported_extension():
 
 
 def _git(cwd, *args):
+    # encoding="utf-8" 고정: 한글 커밋 메시지 등 비ASCII 출력을 Windows 기본
+    # cp949 로 읽다 리더 스레드에서 UnicodeDecodeError 가 나는 것을 막는다 (이슈 #22)
     subprocess.run(
         ["git", "-c", "user.email=t@t", "-c", "user.name=t", *args],
         cwd=cwd, check=True, capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
     )
 
 
