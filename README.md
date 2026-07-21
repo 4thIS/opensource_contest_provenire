@@ -30,6 +30,22 @@ Students, individuals, and small teams are left **defenseless**.
 
 **Provenire opens that door.**
 
+### Worse: most license tools **cannot even see** this problem
+
+What people call "open-source license scanning" is really **three different jobs**:
+
+| | Representative tools | What it inspects | Catches AI-copied code |
+|---|---|---|:--:|
+| **A. Dependency scanning (SCA)** | FOSSA · Snyk · ORT · pip-licenses | the **declared package list** (`requirements.txt`, …) | ❌ |
+| **B. License-text scanners** | ScanCode · licensee · FOSSology · REUSE | the **license header** in each file | ❌ |
+| **C. Code snippet matching** | Black Duck · SCANOSS · **Provenire** | the **similarity of the code itself** | ⭕ |
+
+When an LLM reproduces GPL code, **nothing is added to your dependency list and no license header comes with it.**
+A and B have nothing to look at. Only **C** can catch this.
+
+> Existing tools check **what you pulled in.**
+> Provenire checks **what you copied.**
+
 ---
 
 ## The key insight
@@ -49,6 +65,16 @@ AI output: def truncate_path(path_str, max_len):  ->  def ID(ID, ID):
 **Erase the names. Keep the structure** (keywords, operators, control flow). Then fingerprint it.
 
 → **No matter how the names change, we still catch it.**
+
+And **even within group C**, Provenire is currently the only tool that erases identifiers:
+
+| | Normalization | k-gram | Identifiers |
+|---|---|---|:--:|
+| MOSS (standard config) | strip comments & whitespace | 5 characters | **kept** |
+| [SCANOSS](https://github.com/scanoss/wfp/blob/master/README.md) | strip non-alphanumeric characters | 30 characters | **kept** |
+| **Provenire** | strip comments + **identifiers → `ID`** | 15 tokens | **erased** |
+
+If names survive into the fingerprint, **renaming breaks the fingerprint.**
 
 ---
 
@@ -95,6 +121,23 @@ code. On a **9-project copyleft corpus**: **Precision 100% · Recall 90.7% · F1
 (`python benchmarks/evaluate.py`).
 
 > Reproduce it yourself: [`benchmarks/`](https://github.com/4thIS/opensource_contest_provenire/tree/main/benchmarks) · Details: [`benchmarks/RESULTS.md`](https://github.com/4thIS/opensource_contest_provenire/blob/main/benchmarks/RESULTS.md)
+
+### Where this sits in the research
+
+Provenance tracking for LLM-generated code is an active research area. Recent work
+([Gurioli et al., *Efficient and Scalable Provenance Tracking for LLM-Generated Code Snippets*, 2026](https://arxiv.org/abs/2605.28510))
+solves winnowing's **scalability** problem — a vector-search first stage takes a 10M-snippet corpus
+from linear- to logarithmic-time retrieval. That work, however, **keeps identifiers** during
+normalization, and models renaming as *"a 20% probability of replacing words longer than three
+characters that appear more than twice"* — so **most identifiers survive verbatim.**
+
+Provenire pushes on an **orthogonal axis**: not scale, but **robustness to transformation** —
+detection when **every** identifier has been changed. Notably, the semantic chunking that paper
+lists as future work (*"semantically meaningful units, such as function bodies … via AST analysis"*)
+is **already implemented** here
+([`index/chunker.py`](https://github.com/4thIS/opensource_contest_provenire/blob/main/src/provenire/index/chunker.py)).
+Conversely, the **Type-3 clones** it leaves open (inserted, deleted, or reordered statements) remain
+open for us too — see the [roadmap](#roadmap).
 
 ---
 
