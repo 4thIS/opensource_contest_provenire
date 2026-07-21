@@ -201,9 +201,12 @@ jobs:
 ```
 ⚠️ Provenire — 카피레프트 유사 코드가 발견되었습니다
 
-  98.2%  src/utils.py
+  98.2%  src/utils.py:41-70  (sanitize_path)
      ↳ qutebrowser/utils.py :: sanitize_filename  [GPL-3.0-or-later]
 ```
+
+`파일:시작줄-끝줄` 과 **내 코드 쪽 함수명**까지 찍어주므로, 큰 파일에서도 어디를 고쳐야 하는지
+바로 알 수 있습니다. `--diff` 로 검사해도 줄번호는 **원본 파일 기준**입니다.
 
 **주의할 점**
 - **`fetch-depth: 0` 은 필수입니다.** 기본 checkout 은 커밋 하나만 받아와 base 가 없으므로 `--diff` 가 동작하지 않습니다.

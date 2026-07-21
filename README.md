@@ -194,6 +194,18 @@ jobs:
           fail-on: true        # fail the check on a match (false = comment only)
 ```
 
+A match is reported as `file:start-end` plus the name of **your** enclosing function, so you know
+exactly which lines to look at:
+
+```
+⚠️ Provenire — copyleft-similar code found
+
+  98.2%  src/utils.py:41-70  (sanitize_path)
+     ↳ qutebrowser/utils.py :: sanitize_filename  [GPL-3.0-or-later]
+```
+
+Line numbers refer to the **original file** even under `--diff`, which only scans added lines.
+
 The copyleft fingerprint index ships **inside the package**, so it works with no extra setup.
 Point at your own DB with `index: path/to/your.db` if you build one.
 

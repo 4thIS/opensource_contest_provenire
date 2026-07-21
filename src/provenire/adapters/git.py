@@ -11,28 +11,50 @@
 """
 from __future__ import annotations
 
+import re
 import subprocess
 
-__all__ = ["parse_added_code", "run_git_diff", "changed_code"]
+__all__ = ["parse_added", "parse_added_code", "run_git_diff", "changed_added", "changed_code"]
+
+_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)")
 
 
-def parse_added_code(diff_text: str) -> dict[str, str]:
-    """unified diff → {파일경로: 추가된 코드}. (순수 함수 = 테스트 쉬움)
+def parse_added(diff_text: str) -> dict[str, list[tuple[int, str]]]:
+    """unified diff → {파일경로: [(새 파일 기준 줄번호, 추가된 코드), …]}. (순수 함수)
+
+    줄번호를 같이 들고 나오는 이유: `scan --diff` 는 추가된 줄만 이어붙여 검사하므로,
+    그 이어붙인 덩어리의 3번째 줄이 **원본 파일의 몇 번째 줄인지** 알 방법이 없다.
+    리포트에 엉뚱한 줄번호를 찍는 것은 아예 안 찍는 것보다 나쁘다 → hunk 헤더
+    (`@@ -a,b +c,d @@`)에서 새 파일 시작 줄을 읽고, 컨텍스트/추가 줄마다 증가시킨다.
 
     - `diff --git a/… b/…` 로 파일이 바뀐다 (b/ 쪽 경로를 쓴다 = 새 파일명).
     - `+` 로 시작하되 `+++` 가 아닌 줄이 '추가된 코드'다.
-    - 컨텍스트 줄( ), 삭제 줄(-), 헤더(---/+++/@@)는 무시한다.
+    - 삭제 줄(-)은 새 파일에 없으므로 줄번호를 올리지 않는다.
+    - `\\ No newline at end of file` 은 줄이 아니므로 세지 않는다.
     - 추가 줄이 하나도 없는 파일(순수 삭제 등)은 결과에서 뺀다.
     """
-    files: dict[str, list[str]] = {}
+    files: dict[str, list[tuple[int, str]]] = {}
     current: str | None = None
+    lineno = 0
     for line in diff_text.splitlines():
         if line.startswith("diff --git"):
             current = line.split(" b/")[-1]
             files[current] = []
-        elif current is not None and line.startswith("+") and not line.startswith("+++"):
-            files[current].append(line[1:])
-    return {f: "\n".join(lines) for f, lines in files.items() if lines}
+        elif (m := _HUNK.match(line)) is not None:
+            lineno = int(m.group(1))
+        elif current is None or line.startswith(("+++", "---", "\\")):
+            continue
+        elif line.startswith("+"):
+            files[current].append((lineno, line[1:]))
+            lineno += 1
+        elif not line.startswith("-"):
+            lineno += 1   # 컨텍스트 줄 — 새 파일에도 있으므로 센다
+    return {f: rows for f, rows in files.items() if rows}
+
+
+def parse_added_code(diff_text: str) -> dict[str, str]:
+    """unified diff → {파일경로: 추가된 코드}. parse_added 에서 줄번호만 뗀 것."""
+    return {f: "\n".join(c for _, c in rows) for f, rows in parse_added(diff_text).items()}
 
 
 def run_git_diff(ref: str, cwd: str = ".") -> str:
@@ -50,6 +72,11 @@ def run_git_diff(ref: str, cwd: str = ".") -> str:
         cwd=cwd, check=True,
     )
     return out.stdout
+
+
+def changed_added(ref: str, cwd: str = ".") -> dict[str, list[tuple[int, str]]]:
+    """git diff 를 파싱해 (파일 → [(줄번호, 추가된 코드), …]) 를 돌려준다."""
+    return parse_added(run_git_diff(ref, cwd))
 
 
 def changed_code(ref: str, cwd: str = ".") -> dict[str, str]:
