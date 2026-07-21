@@ -7,8 +7,8 @@ import argparse
 from pathlib import Path
 
 from provenire import Scanner
-from provenire.cli import _load_index, main, scan_paths
-from provenire.index import FileIndex, FingerprintStore, MockIndex
+from provenire.cli import Finding, _load_index, _print_report, main, scan_paths
+from provenire.index import FileIndex, FingerprintStore, Hit, MockIndex
 
 # 인덱스에 심을 "카피레프트 원본" (자체 작성 코드 — 저작권 안전)
 GPL_LIKE = '''
@@ -223,3 +223,17 @@ def test_load_index_empty_when_none_available(monkeypatch):
     """③ --index 도 동봉 인덱스도 없으면 빈 MockIndex 로 동작한다."""
     monkeypatch.setattr("provenire.cli._default_index_path", lambda: None)
     assert isinstance(_load_index(_args(index=None)), MockIndex)
+
+
+def test_report_has_no_ansi_when_piped(capsys):
+    """리포트에 ANSI 색상 코드가 없다 (파이프/캡처 환경).
+
+    GitHub Action 이 리포트를 PR 코멘트에 넣으면 ANSI 코드가 깨진 글자로 보인다
+    (`\\x1b[31m` → `?[31m`). 터미널이 아닐 때는 색상을 끈다. pytest 는 stdout 을
+    캡처(비-tty)하므로 여기서 색상이 새어 나오면 안 된다.
+    """
+    hit = Hit("acme", "util.py", "elide", "GPL-3.0-or-later", "https://x", 5, 5)
+    _print_report([Finding("mine.py", hit, 1.0)], ["mine.py"])
+    out = capsys.readouterr().out
+    assert "\x1b" not in out, "비-tty 출력에 ANSI 색상 코드가 남았다"
+    assert "표절 의심" in out          # 내용은 정상 출력
