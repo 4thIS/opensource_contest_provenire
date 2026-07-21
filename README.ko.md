@@ -26,6 +26,22 @@ Copilot·Cursor·Claude는 **GPL·AGPL 저장소로 학습**되었습니다.
 그런데 이를 검사하는 도구는 **FOSSA · Snyk · Black Duck — 전부 유료**입니다.
 학생·개인·소규모 팀은 **무방비**입니다.
 
+### 게다가, 대부분의 라이선스 도구는 이 문제를 **볼 수조차 없다**
+
+"오픈소스 라이선스 검사"라 불리는 도구는 사실 **세 종류**이고, 서로 다른 일을 합니다.
+
+| | 대표 도구 | 무엇을 보나 | AI가 베낀 코드 |
+|---|---|---|:--:|
+| **A. 의존성 검사 (SCA)** | FOSSA · Snyk · ORT · pip-licenses | `requirements.txt` 등 **선언된 패키지 목록** | ❌ |
+| **B. 라이선스 문구 스캐너** | ScanCode · licensee · FOSSology · REUSE | 파일 헤더의 **라이선스 텍스트** | ❌ |
+| **C. 코드 스니펫 매칭** | Black Duck · SCANOSS · **Provenire** | **코드 본문의 유사도** | ⭕ |
+
+AI가 GPL 코드를 재현할 때 **의존성 목록에는 아무것도 추가되지 않고, 라이선스 헤더도 붙지 않습니다.**
+A와 B는 볼 대상 자체가 없습니다. 이 문제는 **C에서만** 잡힙니다.
+
+> 기존 도구는 **무엇을 가져왔는지**를 검사합니다.
+> Provenire는 **무엇을 베꼈는지**를 검사합니다.
+
 ---
 
 ## 핵심 아이디어
@@ -43,6 +59,16 @@ AI  :  def truncate_path(path_str, max_len):  ->  def ID(ID, ID):
 
 이름은 지우고 **구조(키워드·연산자·제어흐름)만 남긴 뒤** winnowing 지문을 뜹니다.
 → **이름을 아무리 바꿔도 잡힙니다.**
+
+그리고 **C 그룹 안에서도** 식별자를 지우는 도구는 현재 Provenire뿐입니다.
+
+| | 정규화 방식 | k-gram | 식별자 |
+|---|---|---|:--:|
+| MOSS (표준 설정) | 주석·공백 제거 | 5 문자 | **보존** |
+| [SCANOSS](https://github.com/scanoss/wfp/blob/master/README.md) | 영숫자가 아닌 문자 제거 | 30 문자 | **보존** |
+| **Provenire** | 주석 제거 + **식별자 → `ID`** | 15 토큰 | **삭제** |
+
+지문에 이름이 남아 있으면, **이름을 바꾸는 순간 지문이 깨집니다.**
 
 ---
 
@@ -88,6 +114,21 @@ GPL 파일을 통째로 붙여넣거나, GPL 함수 하나를 **변수명만 바
 (`python benchmarks/evaluate.py`).
 
 > 재현: [`benchmarks/`](https://github.com/4thIS/opensource_contest_provenire/tree/main/benchmarks) · 상세: [`benchmarks/RESULTS.md`](https://github.com/4thIS/opensource_contest_provenire/blob/main/benchmarks/RESULTS.md)
+
+### 선행 연구 속에서의 위치
+
+LLM 생성 코드의 출처 추적은 활발한 연구 주제입니다. 최근 연구
+([Gurioli et al., *Efficient and Scalable Provenance Tracking for LLM-Generated Code Snippets*, 2026](https://arxiv.org/abs/2605.28510))는
+winnowing의 **확장성**을 해결했습니다 — 벡터 검색을 앞단에 붙여 1,000만 스니펫 코퍼스에서
+선형 시간을 로그 시간으로 낮췄습니다. 다만 그 연구는 정규화 단계에서 **식별자를 보존**하고,
+이름 변경 시나리오를 *"4글자를 넘고 3회 넘게 등장하는 단어를 20% 확률로 치환"* 으로
+정의합니다 — **식별자의 대부분이 원문 그대로 남습니다.**
+
+Provenire가 파는 축은 **직교합니다.** 규모가 아니라 **변형 내성** — 식별자가 **전부** 바뀐
+조건에서의 탐지입니다. 덧붙여 같은 연구가 향후 과제로 제시한
+*"함수 본문 등 의미 단위로 분할(AST 활용)"* 은 Provenire에 **이미 구현되어 있습니다**
+([`index/chunker.py`](https://github.com/4thIS/opensource_contest_provenire/blob/main/src/provenire/index/chunker.py)).
+반대로 그 연구가 남긴 **Type-3 클론**(문장 추가·삭제·재배열)은 우리에게도 열린 문제입니다 — [로드맵](#로드맵)에 있습니다.
 
 ---
 
