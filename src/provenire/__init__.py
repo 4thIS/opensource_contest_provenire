@@ -13,7 +13,7 @@ from .core.fingerprint import fingerprint
 from .core.matcher import Match, Scanner, compare, containment, jaccard
 from .core.normalizer import normalize_raw, normalize_tokens
 
-__version__ = "0.1.3"   # pyproject.toml 의 version 과 반드시 같다 (tests/test_version.py)
+__version__ = "0.1.4"   # pyproject.toml 의 version 과 반드시 같다 (tests/test_version.py)
 __all__ = [
     "Scanner", "Match", "compare",
     "fingerprint", "normalize_tokens", "normalize_raw",
