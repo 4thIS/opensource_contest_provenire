@@ -77,6 +77,56 @@ def test_normalize_erases_identifier_names():
     assert a == b, "식별자가 익명화되지 않았다"
 
 
+def test_literal_length_is_not_structure():
+    """긴 문자열 리터럴이 `STR` 런을 만들지 않는다.
+
+    Pygments 는 문자열 하나를 여러 토큰으로 쪼개므로, 토큰마다 STR 을 붙이면
+    **리터럴의 길이가 곧 구조**가 된다. 그러면 아무 관계 없는 두 함수가
+    `STRSTRSTR…` 런만으로 지문이 겹친다 (PR #42 에서 dogfooding 이 잡은 오탐).
+    """
+    long_regex = normalize_tokens(r"""x = re.search(r'^version\s*=\s*"([^"]+)"', t)""")
+    short = normalize_tokens("""x = re.search('a', t)""")
+    assert long_regex == short, "리터럴 길이가 지문에 남았다"
+    assert "STRSTRSTR" not in long_regex
+
+
+def test_literal_presence_survives():
+    """길이는 버려도 '리터럴이 있다/없다'는 남아야 한다.
+
+    오탐을 없애려고 리터럴을 **아예 지우고 싶은 유혹**이 있는데, 그러면 `f(a, 'x')` 와
+    `f(a, b)` 가 같아져 구조 정보를 잃는다. 여기서 막는다.
+
+    주의: 이 테스트는 `LITERAL_RUN_MAX` 가 **1 이냐 2 냐**를 가르지 못한다(둘 다 통과).
+    그 선택의 근거는 단위테스트가 아니라 측정이다 — `benchmarks/evaluate.py`
+    (1로 접으면 F1 95.1%→94.1%). RESULTS.md "문자열 리터럴 런" 절 참조.
+    """
+    with_str = normalize_tokens("x = 'a'")
+    without = normalize_tokens("x = y")
+    assert with_str != without, "리터럴 유무가 구분되지 않는다"
+
+
+def test_unrelated_string_heavy_code_does_not_match():
+    """문자열이 많다는 이유만으로 무관한 코드가 겹치지 않는다 (오탐 회귀 방지).
+
+    실제로 tests/test_version.py 의 8줄짜리 함수가 qutebrowser 의 parse_duration 과
+    41.2% 로 걸렸다. 둘 다 정규식을 쓴다는 것 말고는 공통점이 없었다.
+    """
+    mine = """
+def check_version(text):
+    found = re.search(r'^version\\s*=\\s*"([^"]+)"', text, re.MULTILINE).group(1)
+    assert found == expected, f"{found} != {expected} 이다. 확인이 필요하다."
+"""
+    theirs = """
+def parse_duration(duration):
+    match = re.fullmatch(r'(?P<h>[0-9]+h)?\\s*(?P<m>[0-9]+m)?\\s*(?P<s>[0-9]+s)?', duration)
+    if not match or not match.group(0):
+        raise ValueError(f"Invalid duration: {duration} - expected XhYmZs")
+    return int(match.group('s') or 0) * 1000
+"""
+    m = compare(mine, theirs)
+    assert not m.is_suspicious, f"무관한 코드가 {m.similarity:.1%} 로 잡혔다"
+
+
 def test_fingerprint_is_empty_for_short_text():
     assert fingerprint("ab", k=25) == set()
 
