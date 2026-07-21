@@ -139,7 +139,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0       # required — the base commit must exist for the diff
-      - uses: 4thIS/opensource_contest_provenire/.github/action@v0.1.0
+      - uses: 4thIS/opensource_contest_provenire/.github/action@v0.1
         with:
           fail-on: true        # fail the check on a match (false = comment only)
 ```

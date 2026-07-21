@@ -141,7 +141,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0       # 필수 — base 커밋이 있어야 diff 를 계산한다
-      - uses: 4thIS/opensource_contest_provenire/.github/action@v0.1.0
+      - uses: 4thIS/opensource_contest_provenire/.github/action@v0.1
         with:
           fail-on: true        # 발견 시 체크 실패 (false = 코멘트만)
 ```
