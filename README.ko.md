@@ -55,8 +55,8 @@ $ provenire compare ai_output.py gpl_origin.py
 
   모드               유사도   지문
   ------------------------------------------
-  raw (baseline)      2.1%   1/48      <- Copilot 필터 수준: 놓친다
-  tokens (기본)     100.0%   21/21     <- Provenire: 잡아낸다
+  raw (baseline)     12.0%   3/25      <- Copilot 필터 수준: 임계값 미만, 놓친다
+  tokens (기본)     100.0%   24/24     <- Provenire: 잡아낸다
   ------------------------------------------
 
   [!] 표절 의심 — 유사도 100.0% (임계값 30%)
@@ -73,10 +73,19 @@ $ provenire compare ai_output.py gpl_origin.py
 | 변형 시나리오 | raw (baseline) | **tokens (Provenire)** |
 |---|:--:|:--:|
 | 그대로 복사 | 100% | **100%** |
-| 주석·독스트링 삭제 | 100% | **86.4%** |
-| **변수·함수명 전부 변경** | **0.0%** (놓침) | **100.0%** (탐지) |
-| 이름변경 + 주석삭제 + 재포맷 | **0.0%** (놓침) | **86.4%** (탐지) |
+| 주석·독스트링 삭제 | 100% | **87.5%** |
+| **변수·함수명 전부 변경** | **8.8%** (놓침) | **100.0%** (탐지) |
+| 이름변경 + 주석삭제 + 재포맷 | **8.8%** (놓침) | **87.5%** (탐지) |
 | 무관한 코드 (음성대조) | 0% | **0%** (오탐 없음) |
+
+이름을 바꾸면 raw 는 **임계값(30%) 아래로 떨어져 놓치고**, 토큰 정규화는 100% 탐지·오탐 0 입니다.
+
+### 함수 하나를 넘어서
+
+Provenire 는 코드를 **함수 단위로 쪼개** 대조하므로, 큰 파일에 묻힌 카피레프트도 잡습니다 —
+GPL 파일을 통째로 붙여넣거나, GPL 함수 하나를 **변수명만 바꿔 내 코드에 섞어도** 그 조각을
+정확히 짚어냅니다. **9개 카피레프트 프로젝트** 기준 **Precision 100% · Recall 90.7% · F1 95.1% · 오탐 0**
+(`python benchmarks/evaluate.py`).
 
 > 재현: [`benchmarks/`](https://github.com/4thIS/opensource_contest_provenire/tree/main/benchmarks) · 상세: [`benchmarks/RESULTS.md`](https://github.com/4thIS/opensource_contest_provenire/blob/main/benchmarks/RESULTS.md)
 
@@ -170,11 +179,11 @@ jobs:
 - [x] CLI (`compare` / `fingerprint`)
 - [x] 언어팩 구조 — Python · Java · JavaScript · TypeScript
 - [x] **카피레프트 지문 인덱스 동봉** — 설치 즉시 검사된다
-- [x] **`provenire scan`** — 파일 검사 및 `--diff` PR 게이트
+- [x] **`provenire scan`** — 파일 검사(함수 단위 청킹) 및 `--diff` PR 게이트
 - [x] **GitHub Action** — PR 코멘트 + 체크 실패 ([사용법](#github-action))
 - [ ] 인덱스 확장 (LSH/MinHash) — 코퍼스를 더 키우기 위해
 - [ ] LLM 2차 판정 (관용구 vs 구조적 재현)
-- [ ] 더 많은 언어 (Go, C++ 등)
+- [ ] 더 많은 언어 (Go, C++ 등) · Python 외 함수 단위 청킹
 - [ ] pre-commit 훅
 
 ---

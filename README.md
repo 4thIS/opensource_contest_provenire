@@ -61,8 +61,8 @@ $ provenire compare ai_output.py gpl_origin.py
 
   mode              similarity   fingerprints
   ---------------------------------------------
-  raw (baseline)         2.1%    1/48      <- Copilot-filter level: MISSED
-  tokens (default)     100.0%    21/21     <- Provenire: CAUGHT
+  raw (baseline)        12.0%    3/25      <- Copilot-filter level: below threshold, MISSED
+  tokens (default)     100.0%    24/24     <- Provenire: CAUGHT
   ---------------------------------------------
 
   [!] Suspected copy — 100.0% similarity (threshold 30%)
@@ -79,13 +79,20 @@ Benchmarked against **real GPL-3.0 code** (`qutebrowser/utils/utils.py`).
 | Transformation | raw (baseline) | **tokens (Provenire)** |
 |---|:--:|:--:|
 | Verbatim copy | 100% | **100%** |
-| Comments & docstrings stripped | 100% | **86.4%** |
-| **All variable & function names renamed** | **0.0%** (missed) | **100.0%** (caught) |
-| Renamed + stripped + reformatted | **0.0%** (missed) | **86.4%** (caught) |
+| Comments & docstrings stripped | 100% | **87.5%** |
+| **All variable & function names renamed** | **8.8%** (missed) | **100.0%** (caught) |
+| Renamed + stripped + reformatted | **8.8%** (missed) | **87.5%** (caught) |
 | Unrelated code (negative control) | 0% | **0%** (no false positive) |
 
-Across `k = 10…30`, the token engine catches **100%** with **0% false positives**,
-while the raw engine **collapses to 0%**.
+The raw engine stays **well under the 30% threshold** once names change (missed), while the token
+engine catches **100%** with **0% false positives**.
+
+### Beyond single functions
+
+Provenire chunks code **function by function**, so it catches copyleft even when it is buried in a
+larger file — a whole GPL file pasted in, or a single GPL function renamed and mixed into your own
+code. On a **9-project copyleft corpus**: **Precision 100% · Recall 90.7% · F1 95.1% · 0 false positives**
+(`python benchmarks/evaluate.py`).
 
 > Reproduce it yourself: [`benchmarks/`](https://github.com/4thIS/opensource_contest_provenire/tree/main/benchmarks) · Details: [`benchmarks/RESULTS.md`](https://github.com/4thIS/opensource_contest_provenire/blob/main/benchmarks/RESULTS.md)
 
@@ -160,13 +167,13 @@ Notes:
 - [x] Token normalization (identifier anonymization) — **the core moat**
 - [x] Similarity judgment (containment)
 - [x] CLI (`compare` / `fingerprint`)
-- [x] Pluggable language packs
+- [x] Language packs — Python · Java · JavaScript · TypeScript
 - [x] **Bundled copyleft index** — ships with the package; `scan` works out of the box
-- [ ] Scale the index (LSH / MinHash) for larger corpora
-- [x] **`provenire scan`** — file scan & `--diff` PR gate
+- [x] **`provenire scan`** — file scan (function-level chunking) & `--diff` PR gate
 - [x] **GitHub Action** — PR comment + failing check ([usage](#github-action))
+- [ ] Scale the index (LSH / MinHash) for larger corpora
 - [ ] LLM second-pass judgment (idiom vs. structural reproduction)
-- [ ] More languages (Java, JS/TS, Go, C++)
+- [ ] More languages (Go, C++, …) & function-level chunking beyond Python
 - [ ] pre-commit hook
 
 ---
