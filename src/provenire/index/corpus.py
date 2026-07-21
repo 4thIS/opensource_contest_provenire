@@ -26,7 +26,6 @@
 """
 from __future__ import annotations
 
-import ast
 import hashlib
 import sys
 import urllib.request
@@ -35,15 +34,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..core.matcher import Scanner
+from .chunker import iter_functions
 from .store import FingerprintStore
 
 __all__ = ["CorpusSource", "SOURCES", "chunk", "fetch", "build_index"]
 
 _CACHE = Path(__file__).parent / "_corpus_cache"
-
-# 함수가 이보다 짧으면 지문이 안 나오고 대개 관용구다 → 청킹에서 제외.
-_MIN_CHUNK_LINES = 5
-
 
 @dataclass(frozen=True)
 class CorpusSource:
@@ -139,28 +135,20 @@ def fetch(url: str) -> str:
 
 
 def chunk(code: str, lang: str = "python") -> list[tuple[str | None, str]]:
-    """코드를 (심볼, 조각) 목록으로 쪼갠다.
+    """인덱싱용 청킹 — 코드를 (심볼, 조각) 목록으로 쪼갠다.
 
     Python 은 함수 단위(ast). 그 외 언어는 파일 전체를 한 조각으로 (fallback).
     함수 단위 매칭이 정확도에 중요하다 — 큰 파일에서 작은 함수만 베낀 경우를 잡는다.
+
+    스캔(의심 코드)용 청킹은 chunker.chunk_for_scan 을 쓴다 — 함수 로직은 공유하되
+    fallback 이 파일 전체가 아니라 슬라이딩 윈도우다. (§2 참조)
     """
     if lang != "python":
         return [(None, code)]   # ponytail: 비-Python 함수 청킹은 다음 단계(tree-sitter 등)
-
     try:
-        tree = ast.parse(code)
+        return iter_functions(code)      # 함수가 없으면 빈 리스트 (기존 동작 유지)
     except SyntaxError:
         return [(None, code)]
-
-    chunks: list[tuple[str | None, str]] = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if (node.end_lineno or 0) - node.lineno + 1 < _MIN_CHUNK_LINES:
-                continue
-            seg = ast.get_source_segment(code, node)
-            if seg:
-                chunks.append((node.name, seg))
-    return chunks
 
 
 def build_index(

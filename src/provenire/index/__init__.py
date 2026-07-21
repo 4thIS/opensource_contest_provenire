@@ -65,11 +65,12 @@ class _Entry:
 #
 # 실측으로 정한 값 (benchmarks/RESULTS.md "작은 diff 오탐" 절):
 #   min_shared=1 → Recall 98.1% / 오탐 3건
-#   min_shared=3 → Recall 92.6% / 오탐 0건   ← 채택
-#   min_shared=5 → Recall 88.9% / 오탐 0건
-# PR 게이트에서 오탐은 도구를 꺼버리게 만든다. 정탐 일부(대개 아주 짧은 조각)를
-# 내주더라도 오탐 0 을 택했다.
-MIN_SHARED = 3
+#   min_shared=3 → 오탐 0 이었으나, §2 수정으로 슬라이딩 윈도우가 들어온 뒤
+#                  짧은 조각에서 흔한 for-if 구조 3개가 우연히 겹치는 오탐이 재발했다
+#                  (우리 PR #36 을 우리 Action 이 잡음 — dogfooding).
+#   min_shared=4 → 오탐 0, 정탐은 변형함수 100→98/108(2건)만 손실, GPL 파일통째 4/4 유지  ← 채택
+# PR 게이트에서 오탐은 도구를 꺼버리게 만든다. 짧은 조각 정탐 일부를 내주더라도 오탐 0 을 택했다.
+MIN_SHARED = 4
 
 
 def _rank(
