@@ -22,6 +22,7 @@ from .core.fingerprint import K_DEFAULT, W_DEFAULT
 from .core.matcher import Scanner
 from .core.normalizer import normalize_tokens
 from .index import FileIndex, FingerprintStore, Hit, Index, MockIndex
+from .index.chunker import chunk_for_scan
 
 # Windows 콘솔 기본 인코딩(cp949)에서 한글·기호(↳) 출력이 깨지지 않게 고정한다.
 # 이게 없으면 표절을 '찾았을 때'(리포트 출력) UnicodeEncodeError 로 CLI 가 죽는다.
@@ -109,19 +110,32 @@ def scan_code(
     scanner: Scanner,
     threshold: float = Scanner.THRESHOLD,
 ) -> list[Finding]:
-    """코드 문자열 하나를 인덱스와 대조해 Finding 을 모은다 (검사의 최소 단위).
+    """코드 하나를 인덱스와 대조해 Finding 을 모은다 (검사의 최소 단위).
+
+    ⚠️ 코드를 **청크(함수/윈도우) 단위로 쪼개** 각각 판정한다. 파일을 통째로 지문
+    뜨면 containment 분모가 폭발해 큰 파일의 표절을 놓친다 — "GPL 파일 통째 복사"가
+    통과하던 §2 버그의 원인이었다. (chunker.chunk_for_scan · benchmarks/RESULTS.md)
 
     파일 경로 스캔(scan_paths)과 git diff 스캔(scan_changes)이 이 로직을 공유한다.
-    너무 짧아 지문이 안 나오는 조각은 조용히 건너뛴다.
+    한 청크가 여러 원본에 걸리면 최상위 1건만, 한 파일에서 같은 원본 중복은 합친다.
     """
-    fp = scanner.fingerprint_of(code, filename=file)
-    if not fp:
-        return []
+    lang = languages.guess(file).name
     findings: list[Finding] = []
-    for h in index.search(fp):
-        sim = h.shared / len(fp)
-        if sim >= threshold:
-            findings.append(Finding(file=file, hit=h, similarity=sim))
+    seen: set[tuple[str, str, str | None]] = set()
+    for _symbol, piece in chunk_for_scan(code, lang):
+        fp = scanner.fingerprint_of(piece, filename=file)
+        if not fp:
+            continue
+        best: Finding | None = None
+        for h in index.search(fp):
+            sim = h.shared / len(fp)
+            if sim >= threshold and (best is None or sim > best.similarity):
+                best = Finding(file=file, hit=h, similarity=sim)
+        if best is not None:
+            key = (best.hit.project, best.hit.file, best.hit.symbol)
+            if key not in seen:
+                seen.add(key)
+                findings.append(best)
     return findings
 
 

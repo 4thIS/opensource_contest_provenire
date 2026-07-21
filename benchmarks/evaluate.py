@@ -46,6 +46,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from provenire import Scanner  # noqa: E402
+from provenire.cli import scan_code  # noqa: E402
 from provenire.index import FileIndex, FingerprintStore  # noqa: E402
 from provenire.index.corpus import SOURCES, chunk, fetch  # noqa: E402
 
@@ -281,11 +282,13 @@ def load_positives() -> list[tuple[str, str]]:
 
 
 def detected(index: FileIndex, scanner: Scanner, code: str) -> bool:
-    """이 코드가 '표절 의심'으로 판정되는가."""
-    fp = scanner.fingerprint_of(code)
-    if not fp:
-        return False
-    return any(h.shared / len(fp) >= Scanner.THRESHOLD for h in index.search(fp))
+    """이 코드가 '표절 의심'으로 판정되는가.
+
+    ⚠️ 실사용 경로(cli.scan_code)를 그대로 탄다. 이전엔 index.search 를 직접 불러
+    함수 청크 단위로만 조회했다 → "파일 통째 미탐"(§2)을 이 하네스가 우회해 못 잡았다.
+    이제 scan_code 를 거치므로 실제 CLI 와 같은 청킹·판정을 검증한다.
+    """
+    return bool(scan_code(code, "sample.py", index, scanner))
 
 
 def main() -> int:
