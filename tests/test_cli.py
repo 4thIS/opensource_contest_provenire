@@ -7,7 +7,15 @@ import argparse
 from pathlib import Path
 
 from provenire import Scanner
-from provenire.cli import Finding, _load_index, _print_report, main, scan_paths
+from provenire.cli import (
+    Finding,
+    _load_index,
+    _print_report,
+    main,
+    scan_changes,
+    scan_code,
+    scan_paths,
+)
 from provenire.index import FileIndex, FingerprintStore, Hit, MockIndex
 
 # 인덱스에 심을 "카피레프트 원본" (자체 작성 코드 — 저작권 안전)
@@ -165,6 +173,17 @@ def test_scan_ignores_unsupported_extension(tmp_path):
     assert scan_paths([str(tmp_path)], index=_index()) == []
 
 
+def _store_with(code: str) -> FingerprintStore:
+    """원본 지문 하나를 심은 인메모리 store (:memory: 기본값)."""
+    store = FingerprintStore()
+    store.add(
+        Scanner()._fp(code),
+        project="acme", file="util.py", symbol="elide_filename",
+        license="GPL-3.0-or-later", url="https://example.com/util.py",
+    )
+    return store
+
+
 def _build_db(path) -> str:
     """FingerprintStore(sqlite) 에 원본 지문을 심어 db 파일을 만든다 (--index 용)."""
     store = FingerprintStore(str(path))
@@ -237,3 +256,60 @@ def test_report_has_no_ansi_when_piped(capsys):
     out = capsys.readouterr().out
     assert "\x1b" not in out, "비-tty 출력에 ANSI 색상 코드가 남았다"
     assert "표절 의심" in out          # 내용은 정상 출력
+
+
+def test_report_shows_line_range_and_local_symbol(capsys):
+    """리포트가 '내 파일 몇 번째 줄'과 '내 쪽 함수명'까지 찍는다.
+
+    파일명만 알려주면 큰 파일에서 어디를 봐야 할지 알 수 없다. `파일:시작-끝` 형식은
+    대부분의 터미널·에디터가 눌러서 이동할 수 있다.
+    """
+    hit = Hit("acme", "util.py", "elide", "GPL-3.0-or-later", "https://x", 5, 5)
+    _print_report([Finding("mine.py", hit, 0.9, start=41, end=58, symbol="v0")], ["mine.py"])
+    out = capsys.readouterr().out
+    assert "mine.py:41-58" in out
+    assert "(v0)" in out              # 내 코드 쪽 함수명
+
+
+def test_report_omits_line_range_when_unknown(capsys):
+    """줄 위치를 모르면(start=0) 파일명만 찍는다 — 틀린 줄번호를 찍지 않는다."""
+    hit = Hit("acme", "util.py", "elide", "GPL-3.0-or-later", "https://x", 5, 5)
+    _print_report([Finding("mine.py", hit, 0.9)], ["mine.py"])
+    out = capsys.readouterr().out
+    assert "mine.py" in out
+    assert ":0-" not in out and "mine.py:" not in out
+
+
+def test_scan_code_reports_where_the_match_is():
+    """스캔 결과가 '내 파일의 몇 번째 줄'을 담는다 — 정상 함수 뒤에 숨은 조각도 짚는다."""
+    code = "def helper(a, b):\n" + "".join(f"    x{i} = a + b + {i}\n" for i in range(8))
+    code += "    return x0\n\n\n" + GPL_LIKE.strip() + "\n"
+    store = _store_with(GPL_LIKE)
+    findings = scan_code(code, "mine.py", FileIndex(store), Scanner())
+    assert findings, "GPL 함수를 찾지 못했다"
+    f = findings[0]
+    assert f.symbol == "elide_filename"
+    # 보고된 줄 범위 안에 실제로 그 함수가 있어야 한다
+    seg = code.splitlines()[f.start - 1 : f.end]
+    assert seg[0].startswith("def elide_filename")
+
+
+def test_scan_changes_maps_line_numbers_to_real_file():
+    """`--diff` 는 추가된 줄만 이어붙여 검사하지만, 줄번호는 **원본 파일 기준**으로 찍는다."""
+    added = GPL_LIKE.strip().splitlines()
+    line_maps = {"mine.py": list(range(101, 101 + len(added)))}   # 실제로는 101줄부터
+    store = _store_with(GPL_LIKE)
+    findings = scan_changes(
+        {"mine.py": "\n".join(added)}, FileIndex(store), line_maps=line_maps,
+    )
+    assert findings, "GPL 함수를 찾지 못했다"
+    assert findings[0].start == 101      # 덩어리 기준 1 이 아니라 파일 기준 101
+
+
+def test_scan_changes_omits_line_numbers_without_map():
+    """줄번호 맵이 없으면 위치를 비운다 — 덩어리 기준 줄번호를 파일 줄번호인 척하지 않는다."""
+    store = _store_with(GPL_LIKE)
+    findings = scan_changes({"mine.py": GPL_LIKE}, FileIndex(store))
+    assert findings
+    assert findings[0].start == 0
+    assert findings[0].location == "mine.py"

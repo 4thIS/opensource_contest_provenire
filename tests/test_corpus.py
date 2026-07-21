@@ -40,20 +40,30 @@ def truncate_path(path_str, max_len):
 
 def test_chunk_splits_functions_and_skips_tiny():
     chunks = chunk(TWO_FUNCS, "python")
-    names = [name for name, _ in chunks]
+    names = [c.symbol for c in chunks]
     assert "elide_filename" in names
     assert "tiny" not in names        # 5줄 미만 → 청킹 제외
+
+
+def test_chunk_reports_line_range():
+    """조각은 원본에서의 줄 범위를 들고 나온다 — 리포트가 '몇 번째 줄'을 찍으려면 필요하다."""
+    c = next(c for c in chunk(TWO_FUNCS, "python") if c.symbol == "elide_filename")
+    lines = TWO_FUNCS.splitlines()
+    assert lines[c.start - 1].lstrip().startswith("def elide_filename")
+    assert c.end > c.start
+    # 줄 범위로 잘라낸 것이 조각 본문과 같아야 한다 (오프셋이 어긋나지 않았다)
+    assert "\n".join(lines[c.start - 1 : c.end]) == c.code
 
 
 def test_chunk_non_python_is_single_piece():
     chunks = chunk("some { js } code", "javascript")
     assert len(chunks) == 1
-    assert chunks[0][0] is None       # 심볼 없음 = 파일 단위 fallback
+    assert chunks[0].symbol is None   # 심볼 없음 = 파일 단위 fallback
 
 
 def test_chunk_handles_syntax_error():
     chunks = chunk("def broken(:\n", "python")
-    assert chunks == [(None, "def broken(:\n")]
+    assert [(c.symbol, c.code) for c in chunks] == [(None, "def broken(:\n")]
 
 
 def test_build_index_populates_and_detects():

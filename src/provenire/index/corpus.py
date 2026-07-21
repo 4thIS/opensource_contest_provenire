@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..core.matcher import Scanner
-from .chunker import iter_functions
+from .chunker import Chunk, iter_functions
 from .store import FingerprintStore
 
 __all__ = ["CorpusSource", "SOURCES", "chunk", "fetch", "build_index"]
@@ -134,8 +134,8 @@ def fetch(url: str) -> str:
     return src
 
 
-def chunk(code: str, lang: str = "python") -> list[tuple[str | None, str]]:
-    """인덱싱용 청킹 — 코드를 (심볼, 조각) 목록으로 쪼갠다.
+def chunk(code: str, lang: str = "python") -> list[Chunk]:
+    """인덱싱용 청킹 — 코드를 Chunk(심볼·조각·줄범위) 목록으로 쪼갠다.
 
     Python 은 함수 단위(ast). 그 외 언어는 파일 전체를 한 조각으로 (fallback).
     함수 단위 매칭이 정확도에 중요하다 — 큰 파일에서 작은 함수만 베낀 경우를 잡는다.
@@ -143,12 +143,13 @@ def chunk(code: str, lang: str = "python") -> list[tuple[str | None, str]]:
     스캔(의심 코드)용 청킹은 chunker.chunk_for_scan 을 쓴다 — 함수 로직은 공유하되
     fallback 이 파일 전체가 아니라 슬라이딩 윈도우다. (§2 참조)
     """
+    whole = [Chunk(None, code, 1, max(len(code.splitlines()), 1))]
     if lang != "python":
-        return [(None, code)]   # ponytail: 비-Python 함수 청킹은 다음 단계(tree-sitter 등)
+        return whole   # ponytail: 비-Python 함수 청킹은 다음 단계(tree-sitter 등)
     try:
         return iter_functions(code)      # 함수가 없으면 빈 리스트 (기존 동작 유지)
     except SyntaxError:
-        return [(None, code)]
+        return whole
 
 
 def build_index(
@@ -167,12 +168,12 @@ def build_index(
         except Exception:   # noqa: BLE001 - 네트워크 실패는 건너뛴다
             continue
         scanner = Scanner(lang=src.lang)
-        for symbol, piece in chunk(code, src.lang):
-            fp = scanner.fingerprint_of(piece)
+        for c in chunk(code, src.lang):
+            fp = scanner.fingerprint_of(c.code)
             if fp:   # 너무 짧아 지문이 안 나오는 조각은 버린다
                 store.add(
                     fp, project=src.project, file=src.file,
-                    symbol=symbol, license=src.license, url=src.url,
+                    symbol=c.symbol, license=src.license, url=src.url,
                 )
     return store
 

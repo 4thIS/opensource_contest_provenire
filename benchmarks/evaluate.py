@@ -273,8 +273,8 @@ def load_positives() -> list[tuple[str, str]]:
             print(f"  (건너뜀: {src.project}/{Path(src.file).name} — {type(exc).__name__})")
             continue
         used[src.project] = used.get(src.project, 0) + 1
-        for symbol, piece in chunk(code, src.lang)[:N_FUNCS]:
-            out.append((f"{src.project}::{symbol}", piece))
+        for c in chunk(code, src.lang)[:N_FUNCS]:
+            out.append((f"{src.project}::{c.symbol}", c.code))
     return out
     # 주: 본문이 거의 없는 함수(독스트링뿐이고 `return` 하나인 경우 등)도 걸러내지 않고
     #     그대로 평가한다. 임의 기준으로 제외하면 수치는 좋아지지만 "유리한 것만 골랐다"는

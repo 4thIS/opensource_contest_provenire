@@ -18,7 +18,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from . import languages
-from .adapters.git import changed_code
+from .adapters.git import changed_added
 from .core.fingerprint import K_DEFAULT, W_DEFAULT
 from .core.matcher import Scanner
 from .core.normalizer import normalize_tokens
@@ -86,11 +86,19 @@ def cmd_fingerprint(args) -> int:
 
 @dataclass(frozen=True)
 class Finding:
-    """스캔 결과 한 건 — '이 파일이 어떤 카피레프트 원본과 겹치나'."""
+    """스캔 결과 한 건 — '내 파일 어디가 어떤 카피레프트 원본과 겹치나'."""
 
     file: str          # 검사한 내 파일
     hit: Hit           # 겹친 원본 (project·file·license·url ...)
     similarity: float  # 내 코드 지문 중 원본과 겹치는 비율 (0.0 ~ 1.0)
+    start: int = 0     # 내 파일에서 걸린 구간의 시작 줄 (1-indexed, 0 = 위치 불명)
+    end: int = 0       # 〃 끝 줄 (양끝 포함)
+    symbol: str | None = None   # 내 코드 쪽 함수명 (윈도우 청크면 None)
+
+    @property
+    def location(self) -> str:
+        """`파일:시작-끝` — 터미널·에디터가 눌러서 이동할 수 있는 형식."""
+        return f"{self.file}:{self.start}-{self.end}" if self.start else self.file
 
 
 def _iter_source_files(paths: list[str]):
@@ -116,6 +124,7 @@ def scan_code(
     index: Index,
     scanner: Scanner,
     threshold: float = Scanner.THRESHOLD,
+    lines: list[int] | None = None,
 ) -> list[Finding]:
     """코드 하나를 인덱스와 대조해 Finding 을 모은다 (검사의 최소 단위).
 
@@ -124,26 +133,39 @@ def scan_code(
     통과하던 §2 버그의 원인이었다. (chunker.chunk_for_scan · benchmarks/RESULTS.md)
 
     파일 경로 스캔(scan_paths)과 git diff 스캔(scan_changes)이 이 로직을 공유한다.
-    한 청크가 여러 원본에 걸리면 최상위 1건만, 한 파일에서 같은 원본 중복은 합친다.
+    한 청크가 여러 원본에 걸리면 최상위 1건만, 한 파일에서 같은 원본 중복은
+    **유사도가 가장 높은 청크**로 합친다 — 그 청크의 줄범위가 리포트에 찍힌다.
+
+    lines: code 의 i번째 줄이 실제 파일의 몇 번째 줄인지 (`--diff` 는 추가된 줄만
+    이어붙이므로 원본 줄번호와 어긋난다). None 이면 code 가 곧 파일 전체다.
     """
+    def real(n: int) -> int:
+        """청크 기준 줄번호 → 실제 파일 줄번호. (0 = 불명 → 리포트에서 생략)"""
+        if lines is None:
+            return n
+        return lines[n - 1] if 1 <= n <= len(lines) else 0
+
     lang = languages.guess(file).name
-    findings: list[Finding] = []
-    seen: set[tuple[str, str, str | None]] = set()
-    for _symbol, piece in chunk_for_scan(code, lang):
-        fp = scanner.fingerprint_of(piece, filename=file)
+    out: dict[tuple[str, str, str | None], Finding] = {}
+    for ch in chunk_for_scan(code, lang):
+        fp = scanner.fingerprint_of(ch.code, filename=file)
         if not fp:
             continue
-        best: Finding | None = None
+        best_hit, best_sim = None, 0.0
         for h in index.search(fp):
             sim = h.shared / len(fp)
-            if sim >= threshold and (best is None or sim > best.similarity):
-                best = Finding(file=file, hit=h, similarity=sim)
-        if best is not None:
-            key = (best.hit.project, best.hit.file, best.hit.symbol)
-            if key not in seen:
-                seen.add(key)
-                findings.append(best)
-    return findings
+            if sim >= threshold and sim > best_sim:
+                best_hit, best_sim = h, sim
+        if best_hit is None:
+            continue
+        key = (best_hit.project, best_hit.file, best_hit.symbol)
+        prev = out.get(key)
+        if prev is None or best_sim > prev.similarity:
+            out[key] = Finding(
+                file=file, hit=best_hit, similarity=best_sim,
+                start=real(ch.start), end=real(ch.end), symbol=ch.symbol,
+            )
+    return list(out.values())
 
 
 def scan_paths(
@@ -170,11 +192,15 @@ def scan_changes(
     threshold: float = Scanner.THRESHOLD,
     k: int = K_DEFAULT,
     w: int = W_DEFAULT,
+    line_maps: dict[str, list[int]] | None = None,
 ) -> list[Finding]:
     """(파일 → 추가된 코드) 를 인덱스와 대조한다 — `scan --diff` 의 코어.
 
     git diff 어댑터가 준 changes 를 받아 **지원 언어 확장자만** 검사한다.
     scan_paths 와 같은 검사 로직(scan_code)을 공유한다.
+
+    line_maps: 파일별 [추가된 줄의 실제 파일 줄번호] (adapters.git.changed_added).
+    주면 리포트에 원본 파일 기준 줄번호가 찍힌다. 없으면 줄번호를 생략한다.
     """
     exts = languages.extensions()
     findings: list[Finding] = []
@@ -182,7 +208,10 @@ def scan_changes(
     for file, code in changes.items():
         if Path(file).suffix.lower() not in exts:
             continue
-        findings += scan_code(code, file, index, scanner, threshold)
+        # [] = 줄번호 불명 → 리포트에서 줄번호를 생략한다. 여기서 None(=파일 전체)을
+        # 주면 이어붙인 덩어리 기준 줄번호가 그대로 찍혀 **틀린 위치**를 알려준다.
+        lines = (line_maps or {}).get(file, [])
+        findings += scan_code(code, file, index, scanner, threshold, lines)
     return findings
 
 
@@ -229,7 +258,8 @@ def _print_report(findings: list[Finding], paths: list[str]) -> None:
     for f in findings:
         h = f.hit
         sym = f" :: {h.symbol}" if h.symbol else ""
-        print(f"  {RED}{f.similarity*100:5.1f}%{RST}  {f.file}")
+        mine = f"  {DIM}({f.symbol}){RST}" if f.symbol else ""
+        print(f"  {RED}{f.similarity*100:5.1f}%{RST}  {f.location}{mine}")
         print(f"         ↳ {h.project}/{h.file}{sym}  [{YEL}{h.license}{RST}]")
         print(f"           {DIM}{h.url}{RST}")
     print()
@@ -238,9 +268,12 @@ def _print_report(findings: list[Finding], paths: list[str]) -> None:
 def cmd_scan(args) -> int:
     index = _load_index(args)
     if args.diff:
-        changes = changed_code(args.diff)
+        added = changed_added(args.diff)   # {파일: [(실제 줄번호, 코드), …]}
+        changes = {f: "\n".join(c for _, c in rows) for f, rows in added.items()}
+        line_maps = {f: [n for n, _ in rows] for f, rows in added.items()}
         findings = scan_changes(
-            changes, index, threshold=args.threshold, k=args.k, w=args.w
+            changes, index, threshold=args.threshold, k=args.k, w=args.w,
+            line_maps=line_maps,
         )
         _print_report(findings, list(changes))
     elif args.paths:

@@ -7,7 +7,7 @@
 import subprocess
 
 from provenire import Scanner
-from provenire.adapters.git import changed_code, parse_added_code
+from provenire.adapters.git import changed_code, parse_added, parse_added_code
 from provenire.cli import main, scan_changes
 from provenire.index import FingerprintStore, MockIndex
 
@@ -57,6 +57,42 @@ def test_parse_extracts_added_lines_per_file():
     assert "src/foo.py" in changes
     assert "def elide(name, n):" in changes["src/foo.py"]
     assert "marker" in changes["src/foo.py"]
+
+
+# 파일 중간에 끼워 넣는 diff — 추가 줄의 실제 줄번호는 hunk 헤더(@@ … +12)에서만 알 수 있다.
+DIFF_MIDDLE = '''diff --git a/src/foo.py b/src/foo.py
+index 1234..5678 100644
+--- a/src/foo.py
++++ b/src/foo.py
+@@ -10,4 +12,7 @@ def existing():
+     keep_me = 1
+-    removed = 2
++def elide(name, n):
++    marker = "..."
++    return name[:n] + marker
+     tail = 3
+'''
+
+
+def test_parse_added_gives_real_file_line_numbers():
+    """추가된 줄이 **원본 파일에서 몇 번째 줄인지** 를 돌려준다.
+
+    이어붙인 덩어리 기준(1,2,3)이 아니라 hunk 헤더가 말하는 실제 줄번호여야 한다.
+    틀린 줄번호를 리포트에 찍는 것은 아예 안 찍느니만 못하다.
+    """
+    rows = parse_added(DIFF_MIDDLE)["src/foo.py"]
+    assert [n for n, _ in rows] == [13, 14, 15]   # @@ +12 → 컨텍스트 1줄 뒤부터
+    assert [c for _, c in rows][0] == "def elide(name, n):"
+    # 삭제 줄(-)은 새 파일에 없으므로 줄번호를 밀지 않는다
+    assert rows[-1][1] == "    return name[:n] + marker"
+
+
+def test_parse_added_code_matches_parse_added():
+    """parse_added_code 는 parse_added 에서 줄번호만 뗀 것 — 두 결과가 어긋나면 안 된다."""
+    for diff in (DIFF_ONE, DIFF_MIDDLE):
+        assert parse_added_code(diff) == {
+            f: "\n".join(c for _, c in rows) for f, rows in parse_added(diff).items()
+        }
 
 
 def test_parse_ignores_headers_context_and_deletions():
