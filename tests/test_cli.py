@@ -208,10 +208,15 @@ def test_scan_exit_code_1_on_detection(tmp_path):
 
 
 def test_scan_exit_code_0_when_clean(tmp_path):
-    """빈 인덱스(기본) + 무관 코드 → exit 0."""
+    """유효한 인덱스 + 무관 코드 → exit 0.
+
+    (예전엔 --index 없이 빈 인덱스로도 exit 0 이었으나, 그건 fail-open 이라 §5-A 에서
+     막았다. 빈 인덱스는 이제 '깨끗함'을 판정하지 못하고 exit 2 를 낸다.)
+    """
     f = tmp_path / "clean.py"
     f.write_text(CLEAN, encoding="utf-8")
-    assert main(["scan", str(f)]) == 0
+    db = _build_db(tmp_path / "copyleft.db")
+    assert main(["scan", str(f), "--index", db]) == 0
 
 
 # ─────────────────────────── _load_index 폴백 (내장 인덱스) ───────────────────────────
@@ -313,3 +318,42 @@ def test_scan_changes_omits_line_numbers_without_map():
     assert findings
     assert findings[0].start == 0
     assert findings[0].location == "mine.py"
+
+
+# ── fail-open 방지 (인수인계서 §5-A) ─────────────────────────────────────────
+# 라이선스 게이트가 '검사 안 함'을 '깨끗함'으로 보고하면 안 된다.
+
+def test_missing_index_path_fails_loud(tmp_path, capsys, monkeypatch):
+    """--index 경로에 오타가 나면 조용히 통과(exit 0)하지 않고 큰 소리로 실패(exit 2)한다."""
+    monkeypatch.setattr("provenire.cli._default_index_path", lambda: None)
+    f = tmp_path / "some.py"
+    f.write_text("def add(a, b):\n    return a + b\n")
+    code = main(["scan", str(f), "--index", str(tmp_path / "does_not_exist.db")])
+    captured = capsys.readouterr()
+    out = captured.out + captured.err
+    assert code == 2, "없는 인덱스 경로인데 exit 2 가 아니다 (fail-open)"
+    assert "[OK]" not in out, "검사도 안 했는데 [OK] 를 출력했다"
+
+
+def test_empty_index_does_not_report_ok(tmp_path, capsys, monkeypatch):
+    """엔트리 0개인 인덱스로는 '깨끗함'을 판정할 수 없으므로 [OK]/exit 0 을 내지 않는다."""
+    monkeypatch.setattr("provenire.cli._default_index_path", lambda: None)
+    empty = tmp_path / "empty.db"
+    FingerprintStore(str(empty)).close()          # 스키마만, 지문 0개
+    f = tmp_path / "some.py"
+    f.write_text(GPL_LIKE)
+    code = main(["scan", str(f), "--index", str(empty)])
+    out = capsys.readouterr().out
+    assert code == 2, "빈 인덱스인데 exit 2 가 아니다"
+    assert "[OK]" not in out, "빈 인덱스인데 [OK] 를 출력했다"
+
+
+def test_scan_shows_index_source_and_count(tmp_path, capsys):
+    """정상 스캔은 사용한 인덱스 경로와 청크 수를 리포트에 표시한다 (투명성)."""
+    db = _build_db(tmp_path / "idx.db")
+    f = tmp_path / "clean.py"
+    f.write_text("def add(a, b):\n    return a + b\n")
+    code = main(["scan", str(f), "--index", db])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "인덱스:" in out and "청크" in out

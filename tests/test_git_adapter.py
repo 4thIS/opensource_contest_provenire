@@ -264,7 +264,11 @@ def test_changed_code_handles_korean_comments(tmp_path):
 
 
 def test_scan_diff_exit_code_0_when_clean(tmp_path, monkeypatch):
-    """추가 코드가 무관하면 exit 0 (빈 인덱스)."""
+    """추가 코드가 무관하면 exit 0 (유효 인덱스 경유).
+
+    빈 인덱스로 exit 0 을 내던 것은 fail-open(§5-A)이라 막았다 — 이제 유효한 인덱스가
+    있어야 '깨끗함'을 판정한다.
+    """
     _git(tmp_path, "init")
     (tmp_path / "base.py").write_text("x = 1\n", encoding="utf-8")
     _git(tmp_path, "add", "-A")
@@ -274,5 +278,11 @@ def test_scan_diff_exit_code_0_when_clean(tmp_path, monkeypatch):
     _git(tmp_path, "add", "-A")
     _git(tmp_path, "commit", "-m", "add clean")
 
+    db = tmp_path / "idx.db"
+    store = FingerprintStore(str(db))
+    store.add(Scanner()._fp(GPL_LIKE), project="acme", file="u.py",
+              symbol="elide_filename", license="GPL-3.0-or-later", url="https://x")
+    store.close()
+
     monkeypatch.chdir(tmp_path)
-    assert main(["scan", "--diff", "HEAD~1"]) == 0
+    assert main(["scan", "--diff", "HEAD~1", "--index", str(db)]) == 0
