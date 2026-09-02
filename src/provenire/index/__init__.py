@@ -133,6 +133,9 @@ class MockIndex:
         """의심 지문과 겹치는 후보를 공유 지문이 많은 순으로 돌려준다."""
         return _rank(self._entries, fp, top_k)
 
+    def __len__(self) -> int:
+        return len(self._entries)
+
 
 class FileIndex:
     """디스크(sqlite) 지문 저장소를 로드해 검색하는 실제 인덱스.
@@ -162,3 +165,6 @@ class FileIndex:
 
     def search(self, fp: set[int], top_k: int = 10) -> list[Hit]:
         return _rank(self._entries, fp - self._idioms, top_k)
+
+    def __len__(self) -> int:
+        return len(self._entries)

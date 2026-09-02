@@ -241,7 +241,11 @@ def _load_index(args) -> Index:
         ③ 그래도 없으면 빈 MockIndex (소스 실행 등)
     """
     db = getattr(args, "index", None)
-    if db and Path(db).exists():
+    if db is not None:
+        # --index 를 명시했는데 파일이 없으면 조용히 폴백하지 않는다.
+        # 폴백하면 빈 인덱스로 '깨끗함'을 보고해 라이선스 게이트가 무력화된다(fail-open).
+        if not Path(db).exists():
+            raise FileNotFoundError(db)
         return FileIndex(FingerprintStore(db))
     default = _default_index_path()
     if default is not None:
@@ -266,7 +270,22 @@ def _print_report(findings: list[Finding], paths: list[str]) -> None:
 
 
 def cmd_scan(args) -> int:
-    index = _load_index(args)
+    # ── fail-open 방지: 라이선스 게이트는 '검사 안 함'을 '깨끗함'으로 보고하면 안 된다 ──
+    try:
+        index = _load_index(args)
+    except FileNotFoundError as e:
+        print(f"\n  {RED}[오류]{RST} --index 경로를 찾을 수 없습니다: {e}\n"
+              f"        검사를 진행하지 않습니다 (빈 인덱스로 조용히 통과하지 않음).\n",
+              file=sys.stderr)
+        return 2
+    if len(index) == 0:
+        print(f"\n  {RED}[오류]{RST} 인덱스가 비어 있습니다 (지문 0개).\n"
+              f"        카피레프트 지문이 없어 '깨끗함'을 판정할 수 없습니다.\n"
+              f"        pip 설치본을 쓰거나 --index 로 유효한 DB 를 지정하세요.\n",
+              file=sys.stderr)
+        return 2
+    idx_src = args.index if getattr(args, "index", None) else "동봉 인덱스"
+    print(f"\n  {DIM}인덱스: {idx_src} · {len(index)}개 청크{RST}")
     if args.diff:
         added = changed_added(args.diff)   # {파일: [(실제 줄번호, 코드), …]}
         changes = {f: "\n".join(c for _, c in rows) for f, rows in added.items()}

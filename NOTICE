@@ -21,4 +21,16 @@ Algorithm reference (not code):
 Benchmark data:
 
   benchmarks/ fetches source from qutebrowser (GPL-3.0-or-later) at runtime
-  for verification purposes only. No GPL code is vendored in this repository.
+  for verification purposes only. No GPL source code is vendored in this
+  repository.
+
+Copyleft fingerprint index (data/copyleft.db):
+
+  This SQLite database contains *derived integer fingerprints* (winnowing
+  hashes) computed from copyleft-licensed open-source projects, together with
+  per-chunk metadata (project name, SPDX license id, source URL). It does NOT
+  contain any original source code — only irreversible hashes — so it is not a
+  derivative distribution of that code in source form. The projects whose
+  fingerprints are indexed are GPL/AGPL-licensed (qutebrowser, ansible,
+  OctoPrint, searxng, Radicale, ranger, buildbot, weblate, gramps); each entry
+  records its own license and origin URL.
